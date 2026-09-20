@@ -1,0 +1,3475 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f19">
+<title>TradeRadar Pro — لوحة التحليل الفني المباشر</title>
+<meta name="description" content="لوحة تحليل فني مباشرة لـ XAUUSD و NAS100 و EURUSD — إشارات آلية بالكامل، مستويات دخول وخروج، وسجل صفقات.">
+
+<!-- ===== External CDNs (the ONLY dependencies) ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   TradeRadar Pro — Dark Pro Trading Theme
+   ============================================================ */
+:root{
+  --bg:#0b0f19;
+  --panel:#131826;
+  --panel-2:#0f1421;
+  --border:#1f2937;
+  --green:#00ffa3;
+  --red:#ff3b5c;
+  --orange:#ffb020;
+  --text:#e5e7eb;
+  --muted:#6b7280;
+  --blue:#3b82f6;
+  --radius:12px;
+  --mono:'Inter','SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+  --ar:'IBM Plex Sans Arabic','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(0,255,163,.055), transparent 60%),
+    radial-gradient(1000px 600px at 90% 0%, rgba(59,130,246,.06), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--ar);
+  font-size:14px;
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.2px;}
+.mono{font-family:var(--mono);}
+button,input,select{font-family:inherit;color:inherit;}
+button{cursor:pointer;border:none;background:none;}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-track{background:var(--panel-2);}
+::-webkit-scrollbar-thumb{background:#26304a;border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:#35405e;}
+
+/* ---------- Offline banner ---------- */
+#offlineBanner{
+  position:fixed;top:0;left:0;right:0;z-index:900;
+  background:linear-gradient(90deg,#7f1d1d,#991b1b);
+  color:#fff;text-align:center;padding:7px 12px;font-weight:600;font-size:13px;
+  box-shadow:0 4px 18px rgba(0,0,0,.5);
+  transform:translateY(-100%);transition:transform .25s ease;
+}
+#offlineBanner.show{transform:translateY(0);}
+#demoBanner{
+  position:fixed;bottom:0;left:0;right:0;z-index:900;
+  background:#7f1d1d;color:#fff;text-align:center;padding:6px;font-weight:700;font-size:12px;letter-spacing:1px;
+  display:none;
+}
+#demoBanner.show{display:block;}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:800;
+  display:flex;align-items:center;gap:14px;
+  padding:10px 16px;
+  background:rgba(11,15,25,.86);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;letter-spacing:.2px;}
+.brand .logo{
+  width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#00ffa3,#00b3ff);
+  color:#04121a;font-weight:800;font-size:15px;
+  box-shadow:0 0 18px rgba(0,255,163,.28);
+}
+.brand small{color:var(--muted);font-weight:500;font-size:11px;display:block;margin-top:-2px;}
+.topbar-spacer{flex:1;}
+.status-chip{
+  display:flex;align-items:center;gap:7px;
+  background:var(--panel);border:1px solid var(--border);border-radius:999px;
+  padding:5px 12px;font-size:12px;font-weight:600;white-space:nowrap;
+}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:0 0 auto;}
+.dot.connected{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulseDot 2s infinite;}
+.dot.reconnecting{background:var(--orange);box-shadow:0 0 10px var(--orange);animation:pulseDot 1s infinite;}
+.dot.offline{background:var(--red);box-shadow:0 0 10px var(--red);}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+.clock{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+  background:var(--panel);border:1px solid var(--border);font-size:16px;
+  transition:all .2s ease;
+}
+.icon-btn:hover{border-color:#334155;background:#1a2133;transform:translateY(-1px);}
+.live-tag{
+  display:none;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--red);
+  border:1px solid rgba(255,59,92,.4);background:rgba(255,59,92,.08);
+  padding:4px 10px;border-radius:999px;
+}
+.live-tag.show{display:flex;}
+.live-tag .pulse{width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulseDot 1.2s infinite;}
+
+/* ---------- Layout ---------- */
+.wrap{max-width:1920px;margin:0 auto;padding:14px 16px 60px;}
+.section-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:1.2px;margin:16px 2px 10px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ---------- Symbol cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media (max-width:900px){.cards{grid-template-columns:1fr;}}
+.card{
+  position:relative;background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:13px 14px;cursor:pointer;overflow:hidden;
+  transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease;
+}
+.card:hover{border-color:#334155;transform:translateY(-2px);}
+.card.active{border-color:rgba(0,255,163,.55);box-shadow:0 0 0 1px rgba(0,255,163,.18),0 10px 30px -12px rgba(0,255,163,.25);}
+.card.pulse{animation:cardPulse 1.6s ease 3;}
+@keyframes cardPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(0,255,163,0);}
+  50%{box-shadow:0 0 0 6px rgba(0,255,163,.12),0 0 28px rgba(0,255,163,.28);}
+}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.card-sym{font-weight:700;font-size:15px;letter-spacing:.4px;}
+.card-sym-ar{font-size:11px;color:var(--muted);font-weight:500;}
+.badge{
+  font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;
+  letter-spacing:.5px;white-space:nowrap;border:1px solid transparent;
+}
+.badge.buy{background:rgba(0,255,163,.12);color:var(--green);border-color:rgba(0,255,163,.35);}
+.badge.sell{background:rgba(255,59,92,.12);color:var(--red);border-color:rgba(255,59,92,.35);}
+.badge.strong{box-shadow:0 0 14px rgba(0,255,163,.25);}
+.badge.med{background:rgba(255,176,32,.12);color:var(--orange);border-color:rgba(255,176,32,.35);}
+.badge.none{background:rgba(107,114,128,.12);color:var(--muted);border-color:rgba(107,114,128,.25);}
+.card-price{font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:-.5px;transition:color .18s ease;}
+.card-price.up{color:var(--green);}
+.card-price.down{color:var(--red);}
+.card-sub{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:12px;font-family:var(--mono);}
+.chg.up{color:var(--green);}
+.chg.down{color:var(--red);}
+.chg.flat{color:var(--muted);}
+.spark{margin-top:8px;height:34px;width:100%;display:block;}
+.card-foot{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);
+  font-size:11px;color:var(--muted);
+}
+.score-pill{font-family:var(--mono);font-weight:700;font-size:11.5px;}
+
+/* ---------- Workspace ---------- */
+.workspace{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(330px,.85fr);gap:14px;align-items:start;}
+@media (max-width:1150px){.workspace{grid-template-columns:1fr;}}
+
+.panel{
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-head{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 13px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.012);flex-wrap:wrap;
+}
+.panel-title{font-size:13px;font-weight:700;letter-spacing:.3px;}
+.panel-body{padding:12px 13px;}
+
+/* timeframe switcher */
+.tf-bar{display:flex;gap:5px;flex-wrap:wrap;margin-inline-start:auto;}
+.tf-btn{
+  padding:5px 10px;border-radius:8px;font-size:11.5px;font-weight:700;
+  background:#0e1320;border:1px solid var(--border);color:var(--muted);
+  transition:all .18s ease;font-family:var(--mono);
+}
+.tf-btn:hover{color:var(--text);border-color:#334155;}
+.tf-btn.active{background:rgba(0,255,163,.12);color:var(--green);border-color:rgba(0,255,163,.45);}
+
+.charts-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+@media (min-width:1750px){.charts-grid{grid-template-columns:1fr 1fr;}}
+#tv_chart{width:100%;height:420px;}
+#native_chart{width:100%;height:420px;}
+.chart-shell{position:relative;}
+.chart-empty{
+  position:absolute;inset:0;display:grid;place-items:center;
+  color:var(--muted);font-size:13px;background:rgba(11,15,25,.55);
+}
+
+/* ---------- Signal panel ---------- */
+.sig-dir{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px;border-radius:10px;margin-bottom:12px;
+  border:1px solid var(--border);background:#0e1320;
+}
+.sig-dir.buy{border-color:rgba(0,255,163,.4);background:linear-gradient(90deg,rgba(0,255,163,.09),transparent);}
+.sig-dir.sell{border-color:rgba(255,59,92,.4);background:linear-gradient(90deg,rgba(255,59,92,.09),transparent);}
+.sig-dir-main{display:flex;align-items:center;gap:11px;}
+.sig-arrow{font-size:26px;line-height:1;}
+.sig-dir-text{font-size:19px;font-weight:800;letter-spacing:1px;}
+.sig-dir-sub{font-size:11px;color:var(--muted);font-weight:500;}
+.sig-score-box{text-align:center;}
+.sig-score{font-family:var(--mono);font-size:24px;font-weight:800;line-height:1;}
+.sig-score-label{font-size:10px;color:var(--muted);letter-spacing:1px;}
+
+.gauge{height:6px;border-radius:99px;background:#0e1320;overflow:hidden;margin:10px 0 14px;border:1px solid var(--border);}
+.gauge-fill{height:100%;border-radius:99px;transition:width .4s ease,background .3s ease;}
+
+.levels{display:grid;gap:7px;margin-bottom:14px;}
+.level{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 11px;border-radius:9px;background:#0e1320;border:1px solid var(--border);
+}
+.level .lbl{font-size:12px;color:var(--muted);font-weight:600;}
+.level .val{font-family:var(--mono);font-weight:700;font-size:14px;}
+.level.entry{border-color:rgba(59,130,246,.4);}
+.level.entry .val{color:#60a5fa;}
+.level.sl{border-color:rgba(255,59,92,.35);}
+.level.sl .val{color:var(--red);}
+.level.tp .val{color:var(--green);}
+.level .rr{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-inline-start:6px;}
+
+.subhead{
+  font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1.1px;
+  text-transform:uppercase;margin:14px 0 7px;display:flex;align-items:center;gap:7px;
+}
+.subhead::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.reasons{list-style:none;display:grid;gap:5px;}
+.reasons li{
+  display:flex;gap:8px;align-items:flex-start;
+  font-size:12px;padding:6px 9px;border-radius:8px;background:#0e1320;border:1px solid var(--border);
+}
+.reasons li .tick{color:var(--green);font-weight:800;flex:0 0 auto;}
+
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.kv-item{
+  display:flex;justify-content:space-between;gap:6px;
+  padding:6px 9px;border-radius:8px;background:#0e1320;border:1px solid var(--border);
+  font-size:11.5px;
+}
+.kv-item span:first-child{color:var(--muted);}
+.kv-item span:last-child{font-family:var(--mono);font-weight:600;}
+
+.risk-box{background:#0e1320;border:1px solid var(--border);border-radius:10px;padding:10px;}
+.risk-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;}
+.risk-row span:first-child{color:var(--muted);}
+.risk-row span:last-child{font-family:var(--mono);font-weight:700;}
+
+.no-trade{
+  text-align:center;padding:34px 16px;color:var(--muted);
+}
+.no-trade .big{font-size:34px;margin-bottom:8px;opacity:.55;}
+.no-trade .t{font-weight:700;color:var(--text);margin-bottom:4px;}
+.no-trade .s{font-size:12px;}
+
+/* ---------- Journal ---------- */
+.j-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin-bottom:12px;}
+.stat{
+  background:#0e1320;border:1px solid var(--border);border-radius:10px;padding:9px 11px;
+}
+.stat .k{font-size:10.5px;color:var(--muted);letter-spacing:.6px;font-weight:600;}
+.stat .v{font-family:var(--mono);font-size:17px;font-weight:700;margin-top:2px;}
+
+.j-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:11px;}
+.chip{
+  padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:700;
+  background:#0e1320;border:1px solid var(--border);color:var(--muted);transition:all .18s ease;
+}
+.chip:hover{color:var(--text);border-color:#334155;}
+.chip.active{background:rgba(0,255,163,.12);color:var(--green);border-color:rgba(0,255,163,.42);}
+.btn{
+  padding:6px 13px;border-radius:9px;font-size:12px;font-weight:700;
+  background:#0e1320;border:1px solid var(--border);color:var(--text);transition:all .18s ease;
+}
+.btn:hover{border-color:#334155;background:#151c2c;}
+.btn.danger{color:var(--red);border-color:rgba(255,59,92,.32);}
+.btn.danger:hover{background:rgba(255,59,92,.1);}
+.btn.primary{background:linear-gradient(135deg,rgba(0,255,163,.16),rgba(0,179,255,.16));border-color:rgba(0,255,163,.4);color:var(--green);}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+table.j-table{width:100%;border-collapse:collapse;font-size:12px;min-width:1020px;}
+table.j-table th{
+  background:#0e1320;color:var(--muted);font-size:10.5px;font-weight:800;letter-spacing:.7px;
+  text-transform:uppercase;padding:9px 10px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--border);cursor:pointer;user-select:none;position:sticky;top:0;
+}
+table.j-table th:hover{color:var(--text);}
+table.j-table td{padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.6);white-space:nowrap;font-family:var(--mono);}
+table.j-table tbody tr:hover{background:rgba(255,255,255,.017);}
+table.j-table td.ar{font-family:var(--ar);}
+.pnl-pos{color:var(--green);font-weight:700;}
+.pnl-neg{color:var(--red);font-weight:700;}
+.pnl-flat{color:var(--muted);}
+.st{font-family:var(--ar);font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block;}
+.st.open{background:rgba(59,130,246,.14);color:#60a5fa;}
+.st.win{background:rgba(0,255,163,.13);color:var(--green);}
+.st.loss{background:rgba(255,59,92,.13);color:var(--red);}
+.st.weak{background:rgba(255,176,32,.14);color:var(--orange);}
+.empty-row{text-align:center;color:var(--muted);padding:26px !important;font-family:var(--ar) !important;}
+
+/* ---------- Modals ---------- */
+.modal{
+  position:fixed;inset:0;z-index:1000;display:none;
+  align-items:center;justify-content:center;padding:18px;
+  background:rgba(4,7,14,.72);backdrop-filter:blur(6px);
+}
+.modal.show{display:flex;}
+.modal-card{
+  width:100%;max-width:480px;max-height:88vh;overflow-y:auto;
+  background:linear-gradient(180deg,#161c2c,#111624);
+  border:1px solid var(--border);border-radius:16px;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.85);
+  animation:modalIn .22s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-size:15px;font-weight:700;}
+.modal-body{padding:16px 18px;}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:9px;justify-content:flex-end;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+.field input[type=text],.field input[type=number],.field select{
+  width:100%;padding:9px 11px;border-radius:9px;background:#0b0f19;
+  border:1px solid var(--border);font-size:13px;font-family:var(--mono);
+  transition:border-color .18s ease;outline:none;
+}
+.field input:focus,.field select:focus{border-color:rgba(0,255,163,.5);}
+.switch-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(31,41,55,.6);}
+.switch-row:last-child{border-bottom:none;}
+.switch-row .lab{font-size:13px;font-weight:600;}
+.switch-row .sub{font-size:11px;color:var(--muted);}
+.switch{position:relative;width:44px;height:24px;flex:0 0 auto;}
+.switch input{opacity:0;width:0;height:0;position:absolute;}
+.slider{
+  position:absolute;inset:0;background:#26304a;border-radius:99px;transition:.22s;cursor:pointer;
+}
+.slider::before{
+  content:'';position:absolute;height:18px;width:18px;left:3px;top:3px;background:#e5e7eb;
+  border-radius:50%;transition:.22s;
+}
+.switch input:checked + .slider{background:linear-gradient(90deg,#00b37e,#00ffa3);}
+.switch input:checked + .slider::before{transform:translateX(20px);background:#04121a;}
+
+/* ---------- Toasts ---------- */
+#toastWrap{position:fixed;bottom:20px;left:20px;z-index:1200;display:flex;flex-direction:column;gap:8px;max-width:340px;}
+.toast{
+  background:#161c2c;border:1px solid var(--border);border-inline-start:3px solid var(--green);
+  border-radius:10px;padding:10px 13px;font-size:12.5px;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,.8);animation:toastIn .25s ease;
+}
+.toast.err{border-inline-start-color:var(--red);}
+.toast.warn{border-inline-start-color:var(--orange);}
+@keyframes toastIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+
+.footer-note{text-align:center;color:var(--muted);font-size:11px;margin-top:22px;line-height:1.9;}
+.footer-note b{color:#94a3b8;}
+</style>
+</head>
+<body>
+
+<div id="offlineBanner">⚠️ البيانات غير متصلة — جارٍ إعادة الاتصال...</div>
+<div id="demoBanner">وضع تجريبي — DEMO MODE — البيانات المعروضة ليست حقيقية</div>
+
+<!-- ================= TOPBAR ================= -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">TR</div>
+    <div>
+      TradeRadar Pro
+      <small>تحليل فني آلي · 3 أدوات</small>
+    </div>
+  </div>
+
+  <div class="live-tag" id="liveTag"><span class="pulse"></span> LIVE</div>
+
+  <div class="topbar-spacer"></div>
+
+  <div class="clock num" id="clock">--:--:-- UTC</div>
+
+  <div class="status-chip">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">جارٍ الاتصال…</span>
+  </div>
+
+  <button class="icon-btn" id="btnSettings" title="الإعدادات">⚙️</button>
+</header>
+
+<!-- ================= MAIN ================= -->
+<div class="wrap">
+
+  <!-- Symbol cards -->
+  <div class="section-title">الأدوات المتابعة</div>
+  <div class="cards" id="symbolCards"></div>
+
+  <!-- Charts + Signal -->
+  <div class="section-title">التحليل المباشر</div>
+  <div class="workspace">
+
+    <!-- LEFT: charts -->
+    <div class="charts-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">📺 TradingView — <span id="tvSymbolLabel" class="mono">—</span></span>
+          <div class="tf-bar" id="tfBar"></div>
+        </div>
+        <div class="chart-shell">
+          <div id="tv_chart"></div>
+          <div class="chart-empty" id="tvEmpty">جارٍ تحميل مخطط TradingView…</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">🕯️ مخطط الشموع + EMA21 / EMA50 + المستويات</span>
+        </div>
+        <div class="chart-shell">
+          <div id="native_chart"></div>
+          <div class="chart-empty" id="nativeEmpty">بانتظار بيانات الشموع…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: signal panel -->
+    <aside class="panel">
+      <div class="panel-head">
+        <span class="panel-title">🎯 لوحة الإشارة — <span id="sigSymbolLabel" class="mono">—</span></span>
+      </div>
+      <div class="panel-body" id="signalPanel">
+        <div class="no-trade">
+          <div class="big">⏳</div>
+          <div class="t">جارٍ تحميل البيانات…</div>
+          <div class="s">يتم احتساب المؤشرات الفنية</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Journal -->
+  <div class="section-title">سجل الصفقات التلقائي</div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">🧾 Trade Journal</span>
+      <div class="tf-bar">
+        <button class="btn" id="btnExportCsv">⬇️ CSV</button>
+        <button class="btn" id="btnExportJson">⬇️ JSON</button>
+        <button class="btn danger" id="btnClearJournal">🗑️ مسح الكل</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="j-stats" id="journalStats"></div>
+      <div class="j-toolbar" id="journalFilters"></div>
+      <div class="table-wrap">
+        <table class="j-table">
+          <thead>
+            <tr>
+              <th data-sort="ts">التاريخ/الوقت</th>
+              <th data-sort="symbol">الرمز</th>
+              <th data-sort="direction">الاتجاه</th>
+              <th data-sort="entry">الدخول</th>
+              <th data-sort="sl">SL</th>
+              <th data-sort="tp1">TP1</th>
+              <th data-sort="tp2">TP2</th>
+              <th data-sort="tp3">TP3</th>
+              <th data-sort="score">النتيجة</th>
+              <th data-sort="status">الحالة</th>
+              <th data-sort="pnlPips">P/L (نقاط)</th>
+              <th data-sort="pnl">P/L ($)</th>
+              <th data-sort="r">R</th>
+            </tr>
+          </thead>
+          <tbody id="journalBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <b>TradeRadar Pro</b> — التحليل يُحسب آلياً بالكامل من بيانات biquote.io. لا يوجد إدخال يدوي ولا بيانات وهمية.<br>
+    هذه الأداة لأغراض تعليمية وتحليلية ولا تُعد نصيحة استثمارية. التداول ينطوي على مخاطر.
+  </div>
+
+</div>
+
+<!-- ================= SETTINGS MODAL ================= -->
+<div class="modal" id="settingsModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>⚙️ الإعدادات</h3>
+      <button class="icon-btn" data-close="settingsModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>رصيد الحساب ($)</label>
+        <input type="number" id="setBalance" min="1" step="100" value="10000">
+      </div>
+      <div class="field">
+        <label>المخاطرة لكل صفقة (%)</label>
+        <input type="number" id="setRisk" min="0.01" max="100" step="0.1" value="1">
+      </div>
+      <div class="field">
+        <label>الحد الأدنى لنتيجة الإشارة</label>
+        <input type="number" id="setMinScore" min="0" max="100" step="1" value="55">
+      </div>
+      <div class="field">
+        <label>الإطار الزمني الافتراضي</label>
+        <select id="setTimeframe">
+          <option value="1min">M1</option>
+          <option value="5min">M5</option>
+          <option value="15min" selected>M15</option>
+          <option value="30min">M30</option>
+          <option value="1h">H1</option>
+          <option value="4h">H4</option>
+          <option value="1d">D1</option>
+        </select>
+      </div>
+      <div class="switch-row">
+        <div><div class="lab">تنبيه صوتي</div><div class="sub">صفير قصير عند إشارة قوية</div></div>
+        <label class="switch"><input type="checkbox" id="setSound" checked><span class="slider"></span></label>
+      </div>
+      <div class="switch-row">
+        <div><div class="lab">إشعارات المتصفح</div><div class="sub">إشعار نظام عند إشارة قوية</div></div>
+        <label class="switch"><input type="checkbox" id="setNotify"><span class="slider"></span></label>
+      </div>
+      <div class="switch-row">
+        <div><div class="lab">الوضع التجريبي (DEMO)</div><div class="sub">يولّد أسعاراً وهمية — للاختبار فقط</div></div>
+        <label class="switch"><input type="checkbox" id="setDemo"><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="settingsModal">إلغاء</button>
+      <button class="btn primary" id="btnSaveSettings">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CONFIRM MODAL ================= -->
+<div class="modal" id="confirmModal">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-head">
+      <h3>تأكيد</h3>
+      <button class="icon-btn" data-close="confirmModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmText" style="font-size:13.5px;color:#cbd5e1">هل أنت متأكد؟</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="confirmModal">إلغاء</button>
+      <button class="btn danger" id="btnConfirmYes">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap"></div>
+
+<script>
+/* ============================================================================
+   TradeRadar Pro — single-file trading dashboard
+   ----------------------------------------------------------------------------
+   Modules:
+     0) UTIL        — helpers, safe number formatting
+     1) CONFIG      — instrument definitions, timeframes
+     2) App         — global state + settings
+     3) Indicators  — pure math (EMA/RSI/MACD/BB/ATR/Stoch/pivots/patterns)
+     4) Strategy    — confluence scoring + ATR trade levels + position sizing
+     5) DataFeed    — SignalR ticks + REST candles/latest + retry/resilience
+     6) ChartEngine — TradingView widget + lightweight-charts native chart
+     7) Journal     — localStorage CRUD, auto status update, stats, export
+     8) UI          — rendering, events, modals, notifications, toasts
+     9) Bootstrap   — timers, wiring, start
+   ========================================================================= */
+(function () {
+'use strict';
+
+/* ============================================================================
+   0) UTIL
+   ========================================================================= */
+const U = {
+  isNum(v){ return typeof v === 'number' && Number.isFinite(v); },
+
+  num(v){
+    if (v === null || v === undefined || v === '') return null;
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  /* Safe fixed-decimal formatter — NEVER returns NaN/undefined. */
+  fmt(v, d){
+    const n = U.num(v);
+    if (n === null) return '—';
+    const dec = (typeof d === 'number') ? d : 2;
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  },
+
+  /* Signed formatting with explicit + sign */
+  fmtSigned(v, d){
+    const n = U.num(v);
+    if (n === null) return '—';
+    const s = U.fmt(Math.abs(n), d);
+    return (n > 0 ? '+' : n < 0 ? '−' : '') + s;
+  },
+
+  clamp(v, a, b){ return Math.max(a, Math.min(b, v)); },
+
+  uid(){
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  },
+
+  $(sel, root){ return (root || document).querySelector(sel); },
+  $$(sel, root){ return Array.from((root || document).querySelectorAll(sel)); },
+
+  /* Escape for safe innerHTML injection */
+  esc(s){
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+
+  /* UTC clock string */
+  utcNow(){
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds()) + ' UTC';
+  },
+
+  /* Local human timestamp for journal */
+  tsLabel(ts){
+    if (!U.isNum(ts)) return '—';
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  },
+
+  last(arr, back){
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const i = arr.length - 1 - (back || 0);
+    if (i < 0) return null;
+    const v = arr[i];
+    return (v !== null && v !== undefined && Number.isFinite(v)) ? v : null;
+  },
+
+  /* Find first non-null value walking backwards */
+  lastValid(arr, back){
+    if (!Array.isArray(arr)) return null;
+    let skipped = 0;
+    for (let i = arr.length - 1; i >= 0; i--){
+      const v = arr[i];
+      if (v !== null && v !== undefined && Number.isFinite(v)){
+        if (skipped === (back || 0)) return v;
+        skipped++;
+      }
+    }
+    return null;
+  },
+
+  /* Download helper */
+  download(filename, content, mime){
+    try{
+      const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }catch(e){
+      console.warn('🔴 download failed:', e.message);
+      UI.toast('فشل التصدير: ' + e.message, 'err');
+    }
+  }
+};
+
+/* ============================================================================
+   1) CONFIG — instrument definitions
+   ========================================================================= */
+const TIMEFRAMES = [
+  { id:'1min',  label:'M1',  tv:'1'   },
+  { id:'5min',  label:'M5',  tv:'5'   },
+  { id:'15min', label:'M15', tv:'15'  },
+  { id:'30min', label:'M30', tv:'30'  },
+  { id:'1h',    label:'H1',  tv:'60'  },
+  { id:'4h',    label:'H4',  tv:'240' },
+  { id:'1d',    label:'D1',  tv:'D'   }
+];
+
+/*
+  Instrument spec:
+    id           : logical id used everywhere in the app
+    candidates   : ordered list of REST symbols to try (fallback chain)
+    tv           : TradingView widget symbol
+    digits       : display decimals
+    pipSize      : value of 1 "pip" (for pip-distance / pip P&L)
+    valuePerUnit : $ per 1.0 price move per 1.00 lot (for position sizing)
+    candleSec    : seconds per candle on the default timeframe (for % change fallback)
+*/
+const INSTRUMENTS = [
+  {
+    id:'XAUUSD', ar:'الذهب', candidates:['XAUUSD'], tv:'OANDA:XAUUSD',
+    digits:2, pipSize:0.1, valuePerUnit:100, decimalsNote:'oz'
+  },
+  {
+    id:'NAS100', ar:'ناسداك 100', candidates:['NAS100','US100','NDX'], tv:'NASDAQ:NDX',
+    digits:2, pipSize:1, valuePerUnit:1, decimalsNote:'pt'
+  },
+  {
+    id:'EURUSD', ar:'يورو / دولار', candidates:['EURUSD'], tv:'FX:EURUSD',
+    digits:5, pipSize:0.0001, valuePerUnit:100000, decimalsNote:'pip'
+  }
+];
+
+const DEFAULT_SETTINGS = {
+  balance: 10000,
+  riskPct: 1,
+  minScore: 55,
+  timeframe: '15min',
+  sound: true,
+  notify: false,
+  demo: false
+};
+
+/* ============================================================================
+   2) App — global state
+   ========================================================================= */
+const App = {
+  settings: Object.assign({}, DEFAULT_SETTINGS),
+  activeSymbol: 'XAUUSD',
+  timeframe: '15min',
+  status: 'offline',
+  signals: {},          // id -> signal object (or null)
+  prices: {},           // id -> { bid, ask, mid, prevMid, time }
+  candles: {},          // id -> { bars:[], ts:number, tf:string }
+  resolved: {},         // id -> actual REST symbol that worked
+  booted: false,
+  _audioCtx: null,
+  _tvQueue: [],
+  _tvLoading: false,
+  _lastSignalAlert: {}, // id -> ts (debounce alerts)
+
+  getInstrument(id){
+    for (let i = 0; i < INSTRUMENTS.length; i++){
+      if (INSTRUMENTS[i].id === id) return INSTRUMENTS[i];
+    }
+    return null;
+  },
+
+  tfMeta(id){
+    for (let i = 0; i < TIMEFRAMES.length; i++){
+      if (TIMEFRAMES[i].id === id) return TIMEFRAMES[i];
+    }
+    return TIMEFRAMES[2];
+  },
+
+  priceOf(id){
+    const p = App.prices[id];
+    if (p && U.isNum(p.mid)) return p.mid;
+    const c = App.candles[id];
+    if (c && c.bars && c.bars.length){
+      const last = c.bars[c.bars.length - 1];
+      if (last && U.isNum(last.c)) return last.c;
+    }
+    return null;
+  },
+
+  loadSettings(){
+    try{
+      const raw = localStorage.getItem('tradeRadarSettings');
+      if (raw){
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object'){
+          App.settings = Object.assign({}, DEFAULT_SETTINGS, parsed);
+        }
+      }
+    }catch(e){
+      console.warn('🔴 settings load failed:', e.message);
+      App.settings = Object.assign({}, DEFAULT_SETTINGS);
+    }
+    // hard guard on types
+    App.settings.balance = U.num(App.settings.balance) || DEFAULT_SETTINGS.balance;
+    App.settings.riskPct = U.num(App.settings.riskPct) || DEFAULT_SETTINGS.riskPct;
+    App.settings.minScore = U.num(App.settings.minScore);
+    if (App.settings.minScore === null) App.settings.minScore = DEFAULT_SETTINGS.minScore;
+    if (!App.tfMeta(App.settings.timeframe)) App.settings.timeframe = DEFAULT_SETTINGS.timeframe;
+    App.timeframe = App.settings.timeframe;
+  },
+
+  saveSettings(){
+    try{
+      localStorage.setItem('tradeRadarSettings', JSON.stringify(App.settings));
+      console.log('🔵 settings saved', App.settings);
+    }catch(e){
+      console.warn('🔴 settings save failed:', e.message);
+    }
+  }
+};
+
+/* ============================================================================
+   3) Indicators — pure math, no dependencies
+   ========================================================================= */
+const Indicators = {
+
+  /* Simple moving average that tolerates nulls in the input. */
+  sma(values, period){
+    const n = values.length;
+    const out = new Array(n).fill(null);
+    if (!n || period <= 0) return out;
+    const q = [];
+    let sum = 0, count = 0;
+    for (let i = 0; i < n; i++){
+      const v = values[i];
+      q.push(v);
+      if (v !== null && v !== undefined && Number.isFinite(v)){ sum += v; count++; }
+      if (q.length > period){
+        const old = q.shift();
+        if (old !== null && old !== undefined && Number.isFinite(old)){ sum -= old; count--; }
+      }
+      if (q.length === period && count === period) out[i] = sum / period;
+    }
+    return out;
+  },
+
+  /* Exponential moving average, seeded with an SMA. */
+  ema(values, period){
+    const n = values.length;
+    const out = new Array(n).fill(null);
+    if (!n || period <= 0 || n < period) return out;
+    const k = 2 / (period + 1);
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += values[i];
+    let prev = sum / period;
+    out[period - 1] = prev;
+    for (let i = period; i < n; i++){
+      prev = values[i] * k + prev * (1 - k);
+      out[i] = prev;
+    }
+    return out;
+  },
+
+  /* RSI using Wilder's smoothing. */
+  rsi(values, period){
+    period = period || 14;
+    const n = values.length;
+    const out = new Array(n).fill(null);
+    if (n <= period) return out;
+
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++){
+      const d = values[i] - values[i - 1];
+      if (d >= 0) gain += d; else loss -= d;
+    }
+    let avgGain = gain / period;
+    let avgLoss = loss / period;
+    out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+    for (let i = period + 1; i < n; i++){
+      const d = values[i] - values[i - 1];
+      const g = d > 0 ? d : 0;
+      const l = d < 0 ? -d : 0;
+      avgGain = (avgGain * (period - 1) + g) / period;
+      avgLoss = (avgLoss * (period - 1) + l) / period;
+      out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    }
+    return out;
+  },
+
+  /* MACD line + signal line + histogram. */
+  macd(values, fast, slow, signal){
+    fast = fast || 12; slow = slow || 26; signal = signal || 9;
+    const n = values.length;
+    const emaFast = Indicators.ema(values, fast);
+    const emaSlow = Indicators.ema(values, slow);
+
+    const macdLine = new Array(n).fill(null);
+    for (let i = 0; i < n; i++){
+      if (emaFast[i] !== null && emaSlow[i] !== null) macdLine[i] = emaFast[i] - emaSlow[i];
+    }
+
+    // Signal EMA is computed on the contiguous valid portion of the MACD line.
+    let firstIdx = -1;
+    for (let i = 0; i < n; i++){ if (macdLine[i] !== null){ firstIdx = i; break; } }
+    const signalLine = new Array(n).fill(null);
+    const hist = new Array(n).fill(null);
+
+    if (firstIdx >= 0){
+      const valid = macdLine.slice(firstIdx);
+      const sigValid = Indicators.ema(valid, signal);
+      for (let i = 0; i < sigValid.length; i++) signalLine[firstIdx + i] = sigValid[i];
+      for (let i = 0; i < n; i++){
+        if (macdLine[i] !== null && signalLine[i] !== null) hist[i] = macdLine[i] - signalLine[i];
+      }
+    }
+    return { macd: macdLine, signal: signalLine, hist: hist };
+  },
+
+  /* Bollinger Bands + bandwidth series (for squeeze detection). */
+  bollinger(values, period, mult){
+    period = period || 20; mult = mult || 2;
+    const n = values.length;
+    const upper = new Array(n).fill(null);
+    const middle = new Array(n).fill(null);
+    const lower = new Array(n).fill(null);
+    const bw = new Array(n).fill(null);
+    if (n < period) return { upper: upper, middle: middle, lower: lower, bw: bw };
+
+    let sum = 0, sumSq = 0;
+    for (let i = 0; i < n; i++){
+      sum += values[i];
+      sumSq += values[i] * values[i];
+      if (i >= period){
+        sum -= values[i - period];
+        sumSq -= values[i - period] * values[i - period];
+      }
+      if (i >= period - 1){
+        const mean = sum / period;
+        const variance = Math.max(0, sumSq / period - mean * mean);
+        const sd = Math.sqrt(variance);
+        middle[i] = mean;
+        upper[i] = mean + mult * sd;
+        lower[i] = mean - mult * sd;
+        bw[i] = mean !== 0 ? (upper[i] - lower[i]) / Math.abs(mean) : null;
+      }
+    }
+    return { upper: upper, middle: middle, lower: lower, bw: bw };
+  },
+
+  /* ATR with Wilder's smoothing. */
+  atr(bars, period){
+    period = period || 14;
+    const n = bars.length;
+    const out = new Array(n).fill(null);
+    if (n < period + 1) return out;
+
+    const tr = new Array(n).fill(null);
+    for (let i = 0; i < n; i++){
+      const b = bars[i];
+      if (i === 0){ tr[i] = b.h - b.l; continue; }
+      const pc = bars[i - 1].c;
+      tr[i] = Math.max(b.h - b.l, Math.abs(b.h - pc), Math.abs(b.l - pc));
+    }
+    let sum = 0;
+    for (let i = 1; i <= period; i++) sum += tr[i];
+    let prev = sum / period;
+    out[period] = prev;
+    for (let i = period + 1; i < n; i++){
+      prev = (prev * (period - 1) + tr[i]) / period;
+      out[i] = prev;
+    }
+    return out;
+  },
+
+  /* Stochastic oscillator %K (smoothed) and %D. */
+  stochastic(bars, kPeriod, kSmooth, dPeriod){
+    kPeriod = kPeriod || 14; kSmooth = kSmooth || 3; dPeriod = dPeriod || 3;
+    const n = bars.length;
+    const rawK = new Array(n).fill(null);
+
+    for (let i = kPeriod - 1; i < n; i++){
+      let hh = -Infinity, ll = Infinity;
+      for (let j = i - kPeriod + 1; j <= i; j++){
+        if (bars[j].h > hh) hh = bars[j].h;
+        if (bars[j].l < ll) ll = bars[j].l;
+      }
+      rawK[i] = (hh === ll) ? 50 : 100 * (bars[i].c - ll) / (hh - ll);
+    }
+    const k = Indicators.sma(rawK, kSmooth);
+    const d = Indicators.sma(k, dPeriod);
+    return { k: k, d: d, rawK: rawK };
+  },
+
+  /* Swing pivot detection with symmetric lookback. */
+  findPivots(bars, lookback){
+    lookback = lookback || 20;
+    const highs = [], lows = [];
+    const n = bars.length;
+    for (let i = lookback; i < n - lookback; i++){
+      let isHigh = true, isLow = true;
+      for (let j = i - lookback; j <= i + lookback; j++){
+        if (j === i) continue;
+        if (bars[j].h >= bars[i].h) isHigh = false;
+        if (bars[j].l <= bars[i].l) isLow = false;
+        if (!isHigh && !isLow) break;
+      }
+      if (isHigh) highs.push({ i: i, price: bars[i].h, t: bars[i].t });
+      if (isLow) lows.push({ i: i, price: bars[i].l, t: bars[i].t });
+    }
+    return { highs: highs, lows: lows };
+  },
+
+  /* Nearest support below price / resistance above price. */
+  keyLevels(bars, pivots, price){
+    let support = null, resistance = null;
+    if (!U.isNum(price)) return { support: null, resistance: null };
+
+    for (let i = pivots.lows.length - 1; i >= 0; i--){
+      const p = pivots.lows[i].price;
+      if (p < price){ support = p; break; }
+    }
+    for (let i = pivots.highs.length - 1; i >= 0; i--){
+      const p = pivots.highs[i].price;
+      if (p > price){ resistance = p; break; }
+    }
+    // fallbacks: use the most extreme pivots if none found
+    if (support === null && pivots.lows.length) support = pivots.lows[pivots.lows.length - 1].price;
+    if (resistance === null && pivots.highs.length) resistance = pivots.highs[pivots.highs.length - 1].price;
+    return { support: support, resistance: resistance };
+  },
+
+  /* Candlestick pattern detection on the last two bars. */
+  candlePatterns(bars){
+    const out = [];
+    const n = bars.length;
+    if (n < 3) return out;
+
+    const c = bars[n - 1];
+    const p = bars[n - 2];
+
+    const body = Math.abs(c.c - c.o);
+    const range = Math.max(c.h - c.l, 1e-9);
+    const upperWick = c.h - Math.max(c.o, c.c);
+    const lowerWick = Math.min(c.o, c.c) - c.l;
+    const pBody = Math.abs(p.c - p.o);
+
+    const bullish = c.c > c.o;
+    const bearish = c.c < c.o;
+
+    // Engulfing
+    if (bullish && p.c < p.o && c.c >= p.o && c.o <= p.c && body > pBody && body > 0){
+      out.push({ name: 'ابتلاع شرائي (Bullish Engulfing)', dir: 'BUY', strength: 1 });
+    }
+    if (bearish && p.c > p.o && c.o >= p.c && c.c <= p.o && body > pBody && body > 0){
+      out.push({ name: 'ابتلاع بيعي (Bearish Engulfing)', dir: 'SELL', strength: 1 });
+    }
+
+    // Hammer / Shooting star
+    if (lowerWick > body * 2 && upperWick <= body * 0.9 && body / range < 0.42 && lowerWick / range > 0.5){
+      out.push({ name: 'مطرقة (Hammer)', dir: 'BUY', strength: 0.9 });
+    }
+    if (upperWick > body * 2 && lowerWick <= body * 0.9 && body / range < 0.42 && upperWick / range > 0.5){
+      out.push({ name: 'شهاب (Shooting Star)', dir: 'SELL', strength: 0.9 });
+    }
+
+    // Pin bar
+    if (lowerWick / range > 0.62 && c.c > c.o * 0.999){
+      out.push({ name: 'بن بار شرائي (Bullish Pin Bar)', dir: 'BUY', strength: 0.8 });
+    }
+    if (upperWick / range > 0.62 && c.c < c.o * 1.001){
+      out.push({ name: 'بن بار بيعي (Bearish Pin Bar)', dir: 'SELL', strength: 0.8 });
+    }
+
+    // Doji
+    if (body / range < 0.1){
+      out.push({ name: 'دوجي (Doji) — تردد', dir: 'NEUTRAL', strength: 0.4 });
+    }
+    return out;
+  },
+
+  /* Market structure + BOS / CHoCH */
+  marketStructure(bars, pivots){
+    const res = { structure: 'range', bos: null, choch: null };
+    const highs = pivots.highs;
+    const lows = pivots.lows;
+    if (bars.length < 5) return res;
+
+    let structure = 'range';
+    if (highs.length >= 2 && lows.length >= 2){
+      const h1 = highs[highs.length - 1].price, h0 = highs[highs.length - 2].price;
+      const l1 = lows[lows.length - 1].price, l0 = lows[lows.length - 2].price;
+      const hh = h1 > h0, hl = l1 > l0, lh = h1 < h0, ll = l1 < l0;
+      if (hh && hl) structure = 'uptrend';
+      else if (lh && ll) structure = 'downtrend';
+    }
+    res.structure = structure;
+
+    const close = bars[bars.length - 1].c;
+    const lastHigh = highs.length ? highs[highs.length - 1].price : null;
+    const lastLow = lows.length ? lows[lows.length - 1].price : null;
+
+    if (lastHigh !== null && close > lastHigh){
+      res.bos = 'BULLISH';
+      if (structure === 'downtrend') res.choch = 'BULLISH';
+    }
+    if (lastLow !== null && close < lastLow){
+      res.bos = 'BEARISH';
+      if (structure === 'uptrend') res.choch = 'BEARISH';
+    }
+    return res;
+  }
+};
+
+/* ============================================================================
+   4) Strategy — confluence scoring + trade levels
+   ========================================================================= */
+const Strategy = {
+
+  /**
+   * Evaluate a symbol from its candles.
+   * @returns {null|Object} signal object or null when not enough data.
+   */
+  evaluate(symbolId, bars){
+    if (!Array.isArray(bars) || bars.length < 200) return null;
+
+    const closes = bars.map(function (b) { return b.c; });
+    const n = bars.length;
+    const iLast = n - 1;
+
+    /* ---- Compute indicators ---- */
+    const ema9   = Indicators.ema(closes, 9);
+    const ema21  = Indicators.ema(closes, 21);
+    const ema50  = Indicators.ema(closes, 50);
+    const ema200 = Indicators.ema(closes, 200);
+    const rsiArr = Indicators.rsi(closes, 14);
+    const macd   = Indicators.macd(closes, 12, 26, 9);
+    const bb     = Indicators.bollinger(closes, 20, 2);
+    const atrArr = Indicators.atr(bars, 14);
+    const stoch  = Indicators.stochastic(bars, 14, 3, 3);
+    const pivots = Indicators.findPivots(bars, 20);
+    const patterns = Indicators.candlePatterns(bars);
+
+    /* ---- Last / previous values (null-safe) ---- */
+    const e9   = U.last(ema9),   e21 = U.last(ema21);
+    const e50  = U.last(ema50),  e200 = U.last(ema200);
+    const rsi  = U.last(rsiArr), rsiPrev = U.last(rsiArr, 1);
+    const mLine = U.last(macd.macd), mLinePrev = U.last(macd.macd, 1);
+    const sLine = U.last(macd.signal), sLinePrev = U.last(macd.signal, 1);
+    const hist  = U.last(macd.hist), histPrev = U.last(macd.hist, 1);
+    const bbU = U.last(bb.upper), bbM = U.last(bb.middle), bbL = U.last(bb.lower);
+    const bwNow = U.last(bb.bw);
+    const atr = U.last(atrArr);
+    const stK = U.last(stoch.k), stD = U.last(stoch.d);
+    const stKPrev = U.last(stoch.k, 1), stDPrev = U.last(stoch.d, 1);
+
+    const lastBar = bars[iLast];
+    const prevBar = bars[iLast - 1];
+    const close = U.num(lastBar.c);
+    const prevClose = U.num(prevBar.c);
+
+    // Not enough valid values → bail out cleanly (never show broken data).
+    if (!U.isNum(close) || !U.isNum(atr) || atr <= 0) return null;
+    if (!U.isNum(e9) || !U.isNum(e21) || !U.isNum(e50) || !U.isNum(e200)) return null;
+
+    const structure = Indicators.marketStructure(bars, pivots);
+    const levels = Indicators.keyLevels(bars, pivots, close);
+
+    /* ---- Bollinger squeeze detection (bandwidth in bottom quartile of last 100) ---- */
+    let squeeze = false;
+    const bwWindow = [];
+    for (let i = Math.max(0, iLast - 99); i <= iLast; i++){
+      if (U.isNum(bb.bw[i])) bwWindow.push(bb.bw[i]);
+    }
+    if (bwWindow.length >= 30 && U.isNum(bwNow)){
+      const sorted = bwWindow.slice().sort(function (a, b) { return a - b; });
+      const q1 = sorted[Math.floor(sorted.length * 0.25)];
+      squeeze = bwNow <= q1;
+    }
+
+    /* ---- Build context ---- */
+    const ctx = {
+      e9: e9, e21: e21, e50: e50, e200: e200,
+      rsi: rsi, rsiPrev: rsiPrev,
+      mLine: mLine, mLinePrev: mLinePrev,
+      sLine: sLine, sLinePrev: sLinePrev,
+      hist: hist, histPrev: histPrev,
+      bbU: bbU, bbM: bbM, bbL: bbL, squeeze: squeeze,
+      atr: atr,
+      stK: stK, stD: stD, stKPrev: stKPrev, stDPrev: stDPrev,
+      patterns: patterns,
+      structure: structure.structure, bos: structure.bos, choch: structure.choch,
+      support: levels.support, resistance: levels.resistance,
+      close: close, prevClose: prevClose, lastBar: lastBar
+    };
+
+    /* ---- Score both directions, keep the best ---- */
+    const buyRes  = Strategy.score('BUY',  ctx);
+    const sellRes = Strategy.score('SELL', ctx);
+
+    let direction, score, reasons;
+    if (buyRes.score >= sellRes.score){
+      direction = 'BUY'; score = buyRes.score; reasons = buyRes.reasons;
+    } else {
+      direction = 'SELL'; score = sellRes.score; reasons = sellRes.reasons;
+    }
+
+    if (score <= 0 || !reasons.length) return null;
+
+    /* ---- Trade levels (ATR based) ---- */
+    const tradeLevels = Strategy.buildLevels(direction, close, atr);
+
+    return {
+      symbol: symbolId,
+      direction: direction,
+      score: score,
+      grade: score >= 70 ? 'STRONG' : (score >= 55 ? 'MEDIUM' : 'WEAK'),
+      entry: tradeLevels.entry,
+      sl: tradeLevels.sl,
+      tp1: tradeLevels.tp1,
+      tp2: tradeLevels.tp2,
+      tp3: tradeLevels.tp3,
+      rr: tradeLevels.rr,
+      atr: atr,
+      reasons: reasons,
+      indicators: {
+        ema9: e9, ema21: e21, ema50: e50, ema200: e200,
+        rsi: rsi, macd: mLine, macdSignal: sLine, macdHist: hist,
+        bbUpper: bbU, bbMiddle: bbM, bbLower: bbL,
+        stochK: stK, stochD: stD,
+        atr: atr,
+        structure: structure.structure,
+        bos: structure.bos,
+        choch: structure.choch,
+        support: levels.support,
+        resistance: levels.resistance
+      },
+      patterns: patterns,
+      ts: Date.now()
+    };
+  },
+
+  /**
+   * Confluence scoring for a single direction. Max = 100.
+   */
+  score(dir, ctx){
+    let score = 0;
+    const reasons = [];
+    const isBuy = dir === 'BUY';
+
+    /* --- 1) Trend alignment — max 25 --- */
+    if (U.isNum(ctx.e9) && U.isNum(ctx.e21) && U.isNum(ctx.e50) && U.isNum(ctx.e200)){
+      const stacked = isBuy
+        ? (ctx.e9 > ctx.e21 && ctx.e21 > ctx.e50 && ctx.e50 > ctx.e200)
+        : (ctx.e9 < ctx.e21 && ctx.e21 < ctx.e50 && ctx.e50 < ctx.e200);
+      const partial = isBuy
+        ? (ctx.e9 > ctx.e21 && ctx.e21 > ctx.e50)
+        : (ctx.e9 < ctx.e21 && ctx.e21 < ctx.e50);
+      const shortOnly = isBuy ? (ctx.e9 > ctx.e21) : (ctx.e9 < ctx.e21);
+
+      if (stacked){
+        score += 25;
+        reasons.push('ترتيب كامل للمتوسطات ' + (isBuy ? '(9>21>50>200)' : '(9<21<50<200)'));
+      } else if (partial){
+        score += 15;
+        reasons.push('ترتيب متوسطات ' + (isBuy ? '(9>21>50)' : '(9<21<50)'));
+      } else if (shortOnly){
+        score += 8;
+        reasons.push('تقاطع قصير ' + (isBuy ? '(EMA9>EMA21)' : '(EMA9<EMA21)'));
+      }
+    }
+
+    /* --- 2) RSI — max 15 --- */
+    if (U.isNum(ctx.rsi) && U.isNum(ctx.rsiPrev)){
+      if (isBuy){
+        if (ctx.rsi < 30 && ctx.rsi > ctx.rsiPrev){
+          score += 15; reasons.push('RSI تشبع بيعي وصاعد (' + U.fmt(ctx.rsi, 1) + ')');
+        } else if (ctx.rsi > 50 && ctx.rsi > ctx.rsiPrev){
+          score += 7; reasons.push('RSI فوق 50 وصاعد (' + U.fmt(ctx.rsi, 1) + ')');
+        }
+      } else {
+        if (ctx.rsi > 70 && ctx.rsi < ctx.rsiPrev){
+          score += 15; reasons.push('RSI تشبع شرائي وهابط (' + U.fmt(ctx.rsi, 1) + ')');
+        } else if (ctx.rsi < 50 && ctx.rsi < ctx.rsiPrev){
+          score += 7; reasons.push('RSI تحت 50 وهابط (' + U.fmt(ctx.rsi, 1) + ')');
+        }
+      }
+    }
+
+    /* --- 3) MACD — max 20 --- */
+    if (U.isNum(ctx.mLine) && U.isNum(ctx.sLine) && U.isNum(ctx.hist)){
+      const crossedUp = U.isNum(ctx.mLinePrev) && U.isNum(ctx.sLinePrev) &&
+                        ctx.mLine > ctx.sLine && ctx.mLinePrev <= ctx.sLinePrev;
+      const crossedDown = U.isNum(ctx.mLinePrev) && U.isNum(ctx.sLinePrev) &&
+                          ctx.mLine < ctx.sLine && ctx.mLinePrev >= ctx.sLinePrev;
+
+      if (isBuy){
+        if (crossedUp && ctx.hist > 0){
+          score += 20; reasons.push('تقاطع MACD صاعد + هيستوجرام موجب');
+        } else if (ctx.hist > 0 && U.isNum(ctx.histPrev) && ctx.hist > ctx.histPrev){
+          score += 10; reasons.push('زخم MACD موجب ومتزايد');
+        } else if (ctx.hist > 0){
+          score += 6; reasons.push('هيستوجرام MACD موجب');
+        }
+      } else {
+        if (crossedDown && ctx.hist < 0){
+          score += 20; reasons.push('تقاطع MACD هابط + هيستوجرام سالب');
+        } else if (ctx.hist < 0 && U.isNum(ctx.histPrev) && ctx.hist < ctx.histPrev){
+          score += 10; reasons.push('زخم MACD سالب ومتزايد');
+        } else if (ctx.hist < 0){
+          score += 6; reasons.push('هيستوجرام MACD سالب');
+        }
+      }
+    }
+
+    /* --- 4) Bollinger — max 10 --- */
+    if (U.isNum(ctx.bbU) && U.isNum(ctx.bbL) && U.isNum(ctx.close)){
+      const bullishCandle = ctx.lastBar && ctx.lastBar.c > ctx.lastBar.o;
+      const bearishCandle = ctx.lastBar && ctx.lastBar.c < ctx.lastBar.o;
+
+      if (isBuy){
+        if (ctx.close <= ctx.bbL && bullishCandle){
+          score += 10; reasons.push('لمس الحد السفلي لبولنجر مع شمعة انعكاسية صاعدة');
+        } else if (ctx.squeeze && ctx.close > ctx.bbU){
+          score += 10; reasons.push('اختراق صاعد بعد انضغاط بولنجر (Squeeze Breakout)');
+        }
+      } else {
+        if (ctx.close >= ctx.bbU && bearishCandle){
+          score += 10; reasons.push('لمس الحد العلوي لبولنجر مع شمعة انعكاسية هابطة');
+        } else if (ctx.squeeze && ctx.close < ctx.bbL){
+          score += 10; reasons.push('اختراق هابط بعد انضغاط بولنجر (Squeeze Breakout)');
+        }
+      }
+    }
+
+    /* --- 5) Stochastic — max 10 --- */
+    if (U.isNum(ctx.stK) && U.isNum(ctx.stD) && U.isNum(ctx.stKPrev) && U.isNum(ctx.stDPrev)){
+      const crossUp = ctx.stKPrev <= ctx.stDPrev && ctx.stK > ctx.stD;
+      const crossDown = ctx.stKPrev >= ctx.stDPrev && ctx.stK < ctx.stD;
+
+      if (isBuy){
+        if (crossUp && ctx.stK < 25){
+          score += 10; reasons.push('تقاطع ستوكاستيك صاعد في التشبع البيعي');
+        } else if (ctx.stK > ctx.stD && ctx.stK < 50){
+          score += 5; reasons.push('ستوكاستيك صاعد تحت 50');
+        }
+      } else {
+        if (crossDown && ctx.stK > 75){
+          score += 10; reasons.push('تقاطع ستوكاستيك هابط في التشبع الشرائي');
+        } else if (ctx.stK < ctx.stD && ctx.stK > 50){
+          score += 5; reasons.push('ستوكاستيك هابط فوق 50');
+        }
+      }
+    }
+
+    /* --- 6) Candlestick pattern at key S/R — max 15 --- */
+    if (ctx.patterns && ctx.patterns.length){
+      const matching = ctx.patterns.filter(function (p) { return p.dir === dir; });
+      if (matching.length){
+        const pat = matching[0];
+        if (isBuy){
+          const nearSupport = U.isNum(ctx.support) &&
+            Math.abs(ctx.close - ctx.support) <= ctx.atr * 1.5;
+          if (nearSupport){
+            score += 15; reasons.push(pat.name + ' عند دعم ' + U.fmt(ctx.support, 2));
+          } else {
+            score += 8; reasons.push(pat.name);
+          }
+        } else {
+          const nearResistance = U.isNum(ctx.resistance) &&
+            Math.abs(ctx.resistance - ctx.close) <= ctx.atr * 1.5;
+          if (nearResistance){
+            score += 15; reasons.push(pat.name + ' عند مقاومة ' + U.fmt(ctx.resistance, 2));
+          } else {
+            score += 8; reasons.push(pat.name);
+          }
+        }
+      }
+    }
+
+    /* --- 7) BOS / CHoCH — max 5 --- */
+    if (isBuy){
+      if (ctx.choch === 'BULLISH'){ score += 5; reasons.push('تغيّر طابع صاعد (CHoCH)'); }
+      else if (ctx.bos === 'BULLISH'){ score += 5; reasons.push('كسر هيكل صاعد (BOS)'); }
+    } else {
+      if (ctx.choch === 'BEARISH'){ score += 5; reasons.push('تغيّر طابع هابط (CHoCH)'); }
+      else if (ctx.bos === 'BEARISH'){ score += 5; reasons.push('كسر هيكل هابط (BOS)'); }
+    }
+
+    return { score: Math.min(100, score), reasons: reasons };
+  },
+
+  /**
+   * ATR-based entry / SL / TP1-3 + R:R ratios.
+   */
+  buildLevels(dir, entry, atr){
+    const isBuy = dir === 'BUY';
+    const s = isBuy ? 1 : -1;
+    const sl  = entry - s * 1.5 * atr;
+    const tp1 = entry + s * 1.5 * atr;
+    const tp2 = entry + s * 2.5 * atr;
+    const tp3 = entry + s * 4.0 * atr;
+    return {
+      entry: entry, sl: sl, tp1: tp1, tp2: tp2, tp3: tp3,
+      rr: { tp1: 1.0, tp2: 1.67, tp3: 2.67 }
+    };
+  },
+
+  /**
+   * Position sizing from account balance + risk %.
+   * lots = riskAmount / (slDistance * valuePerPriceUnitPerLot)
+   */
+  positionSize(inst, entry, sl){
+    const out = { lots: null, riskAmount: null, slDistance: null, slPips: null, pipValuePerLot: null };
+    if (!inst) return out;
+
+    const dist = Math.abs(entry - sl);
+    if (!U.isNum(dist) || dist <= 0) return out;
+
+    const balance = U.num(App.settings.balance);
+    const riskPct = U.num(App.settings.riskPct);
+    if (balance === null || riskPct === null) return out;
+
+    const riskAmount = balance * (riskPct / 100);
+    const perLot = dist * inst.valuePerUnit;
+    if (!U.isNum(perLot) || perLot <= 0) return out;
+
+    out.slDistance = dist;
+    out.slPips = dist / inst.pipSize;
+    out.riskAmount = riskAmount;
+    out.lots = riskAmount / perLot;
+    out.pipValuePerLot = inst.pipSize * inst.valuePerUnit;
+    return out;
+  }
+};
+
+/* ============================================================================
+   5) DataFeed — SignalR ticks + REST candles, with full resilience
+   ========================================================================= */
+const DataFeed = {
+
+  connection: null,
+  _retryTimer: null,
+  _retryDelay: 5000,
+  _starting: false,
+  _tickHandlers: [],
+  _lastCandleFetch: 0,
+
+  onTick(fn){ if (typeof fn === 'function') DataFeed._tickHandlers.push(fn); },
+
+  setStatus(status){
+    App.status = status;
+    UI.renderStatus(status);
+  },
+
+  /* ------------------------------------------------------------------
+     Symbol resolution — NAS100 → US100 → NDX fallback chain
+     ------------------------------------------------------------------ */
+  async resolveSymbols(){
+    for (let i = 0; i < INSTRUMENTS.length; i++){
+      const inst = INSTRUMENTS[i];
+      if (App.resolved[inst.id]) continue;
+
+      for (let c = 0; c < inst.candidates.length; c++){
+        const cand = inst.candidates[c];
+        try{
+          const bars = await DataFeed.fetchCandles(cand, '15min', 300);
+          if (bars && bars.length >= 50){
+            App.resolved[inst.id] = cand;
+            App.candles[inst.id] = { bars: bars, ts: Date.now(), tf: '15min', symbol: cand };
+            console.log('🟢 symbol resolved: ' + inst.id + ' → ' + cand + ' (' + bars.length + ' bars)');
+            break;
+          } else {
+            console.warn('🟠 ' + inst.id + ' candidate "' + cand + '" returned insufficient bars');
+          }
+        }catch(err){
+          console.warn('🔴 ' + inst.id + ' candidate "' + cand + '" failed: ' + err.message);
+        }
+      }
+      if (!App.resolved[inst.id]){
+        console.error('🔴 could not resolve any symbol for ' + inst.id);
+      }
+    }
+  },
+
+  /* ------------------------------------------------------------------
+     REST: historical candles
+     ------------------------------------------------------------------ */
+  async fetchCandles(symbol, interval, limit){
+    interval = interval || '15min';
+    limit = limit || 300;
+
+    if (App.settings.demo) return DataFeed.generateDemoBars(symbol, interval, limit);
+
+    const url = 'https://biquote.io/api/' + encodeURIComponent(symbol) +
+                '/candles?interval=' + encodeURIComponent(interval) + '&limit=' + limit;
+
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeout = setTimeout(function () { if (controller) controller.abort(); }, 12000);
+
+    let res;
+    try{
+      res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const data = await res.json();
+    let raw = [];
+    if (Array.isArray(data)) raw = data;
+    else if (data && Array.isArray(data.bars)) raw = data.bars;
+    else if (data && Array.isArray(data.data)) raw = data.data;
+    else if (data && Array.isArray(data.candles)) raw = data.candles;
+
+    const bars = DataFeed.normalizeBars(raw);
+    if (!bars.length) throw new Error('empty candle payload');
+    return bars;
+  },
+
+  /* Normalize heterogeneous bar field names → {t,o,h,l,c,v} */
+  normalizeBars(raw){
+    const out = [];
+    if (!Array.isArray(raw)) return out;
+
+    for (let i = 0; i < raw.length; i++){
+      const b = raw[i];
+      if (!b || typeof b !== 'object') continue;
+
+      let t = b.t !== undefined ? b.t : (b.time !== undefined ? b.time : b.timestamp);
+      let o = b.o !== undefined ? b.o : b.open;
+      let h = b.h !== undefined ? b.h : b.high;
+      let l = b.l !== undefined ? b.l : b.low;
+      let c = b.c !== undefined ? b.c : b.close;
+      let v = b.v !== undefined ? b.v : b.volume;
+
+      t = U.num(t); o = U.num(o); h = U.num(h); l = U.num(l); c = U.num(c);
+      v = U.num(v);
+
+      if (t === null || o === null || h === null || l === null || c === null) continue;
+
+      // Normalize seconds → milliseconds
+      if (t < 1e12) t = t * 1000;
+
+      out.push({ t: t, o: o, h: h, l: l, c: c, v: v === null ? 0 : v });
+    }
+
+    out.sort(function (a, b) { return a.t - b.t; });
+
+    // Deduplicate identical timestamps (keep the latest)
+    const dedup = [];
+    for (let i = 0; i < out.length; i++){
+      if (dedup.length && dedup[dedup.length - 1].t === out[i].t) dedup[dedup.length - 1] = out[i];
+      else dedup.push(out[i]);
+    }
+    return dedup;
+  },
+
+  /* ------------------------------------------------------------------
+     REST: latest prices (backup when websocket drops)
+     ------------------------------------------------------------------ */
+  async fetchLatest(symbols){
+    const list = symbols || INSTRUMENTS.map(function (i) {
+      return App.resolved[i.id] || i.id;
+    });
+    const q = list.map(function (s) { return 'symbols=' + encodeURIComponent(s); }).join('&');
+    const url = 'https://biquote.io/api/latest?' + q;
+
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  },
+
+  /* ------------------------------------------------------------------
+     SignalR streaming
+     ------------------------------------------------------------------ */
+  init(){
+    if (typeof signalR === 'undefined'){
+      console.warn('🔴 SignalR library unavailable — falling back to REST polling only.');
+      DataFeed.setStatus('offline');
+      return;
+    }
+
+    try{
+      DataFeed.connection = new signalR.HubConnectionBuilder()
+        .withUrl('https://biquote.io/hubs/tick')
+        .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+        .configureLogging(signalR.LogLevel.Warning)
+        .build();
+
+      DataFeed.connection.on('ReceiveTick', function (tick) {
+        try{ DataFeed.handleTick(tick); }
+        catch(e){ console.warn('🔴 tick handler error:', e.message); }
+      });
+
+      DataFeed.connection.onreconnecting(function () {
+        console.warn('🟠 SignalR reconnecting…');
+        DataFeed.setStatus('reconnecting');
+      });
+
+      DataFeed.connection.onreconnected(async function () {
+        console.log('🟢 SignalR reconnected');
+        DataFeed.setStatus('connected');
+        DataFeed._retryDelay = 5000;
+        await DataFeed.subscribe();
+      });
+
+      DataFeed.connection.onclose(function () {
+        console.warn('🔴 SignalR closed');
+        DataFeed.setStatus('offline');
+        DataFeed.scheduleRetry();
+      });
+
+      DataFeed.start();
+
+    }catch(e){
+      console.error('🔴 SignalR init failed:', e.message);
+      DataFeed.setStatus('offline');
+      DataFeed.scheduleRetry();
+    }
+  },
+
+  async start(){
+    if (DataFeed._starting) return;
+    if (!DataFeed.connection) return;
+    if (DataFeed.connection.state === signalR.HubConnectionState.Connected) return;
+
+    DataFeed._starting = true;
+    try{
+      await DataFeed.connection.start();
+      console.log('🟢 SignalR connected');
+      DataFeed.setStatus('connected');
+      DataFeed._retryDelay = 5000;
+      await DataFeed.subscribe();
+    }catch(err){
+      console.warn('🔴 SignalR start failed: ' + err.message);
+      DataFeed.setStatus('offline');
+      DataFeed.scheduleRetry();
+    }finally{
+      DataFeed._starting = false;
+    }
+  },
+
+  async subscribe(){
+    try{
+      if (!DataFeed.connection ||
+          DataFeed.connection.state !== signalR.HubConnectionState.Connected) return;
+
+      const symbols = INSTRUMENTS.map(function (inst) {
+        return App.resolved[inst.id] || inst.id;
+      });
+      await DataFeed.connection.invoke('Subscribe', symbols);
+      console.log('🔵 subscribed to ticks: ' + symbols.join(', '));
+    }catch(err){
+      console.warn('🔴 subscribe failed: ' + err.message);
+    }
+  },
+
+  /* Exponential backoff: 5s → 10s → 20s → 30s (cap) */
+  scheduleRetry(){
+    if (DataFeed._retryTimer) return;
+    const delay = DataFeed._retryDelay;
+    console.log('🔵 retrying SignalR in ' + Math.round(delay / 1000) + 's');
+
+    DataFeed._retryTimer = setTimeout(function () {
+      DataFeed._retryTimer = null;
+      DataFeed._retryDelay = Math.min(30000, DataFeed._retryDelay * 2);
+      DataFeed.start();
+    }, delay);
+  },
+
+  /* ------------------------------------------------------------------
+     Tick handling
+     ------------------------------------------------------------------ */
+  handleTick(tick){
+    if (!tick || typeof tick !== 'object') return;
+
+    const rawSym = tick.symbol || tick.s || tick.Symbol;
+    if (!rawSym) return;
+
+    const id = DataFeed.mapToInstrument(String(rawSym).toUpperCase());
+    if (!id) return;
+
+    const bid = U.num(tick.bid !== undefined ? tick.bid : tick.b);
+    const ask = U.num(tick.ask !== undefined ? tick.ask : tick.a);
+    let mid = U.num(tick.mid !== undefined ? tick.mid : tick.m);
+
+    if (mid === null){
+      if (bid !== null && ask !== null) mid = (bid + ask) / 2;
+      else if (bid !== null) mid = bid;
+      else if (ask !== null) mid = ask;
+    }
+    if (mid === null) return;
+
+    DataFeed.applyPrice(id, bid, ask, mid, tick.time);
+  },
+
+  /* Map an incoming websocket symbol back to a logical instrument id. */
+  mapToInstrument(sym){
+    const upper = String(sym).toUpperCase();
+    for (let i = 0; i < INSTRUMENTS.length; i++){
+      const inst = INSTRUMENTS[i];
+      if (inst.id === upper) return inst.id;
+      const resolved = App.resolved[inst.id];
+      if (resolved && String(resolved).toUpperCase() === upper) return inst.id;
+      for (let c = 0; c < inst.candidates.length; c++){
+        if (String(inst.candidates[c]).toUpperCase() === upper) return inst.id;
+      }
+    }
+    return null;
+  },
+
+  applyPrice(id, bid, ask, mid, time){
+    const prev = App.prices[id];
+    const prevMid = prev && U.isNum(prev.mid) ? prev.mid : null;
+
+    App.prices[id] = {
+      bid: bid !== null && bid !== undefined ? bid : (prev ? prev.bid : null),
+      ask: ask !== null && ask !== undefined ? ask : (prev ? prev.ask : null),
+      mid: mid,
+      prevMid: prevMid,
+      time: time || Date.now()
+    };
+
+    // Keep the in-memory last candle in sync with the live price.
+    const c = App.candles[id];
+    if (c && c.bars && c.bars.length){
+      const last = c.bars[c.bars.length - 1];
+      if (last){
+        last.c = mid;
+        if (mid > last.h) last.h = mid;
+        if (mid < last.l) last.l = mid;
+      }
+    }
+
+    for (let i = 0; i < DataFeed._tickHandlers.length; i++){
+      try{ DataFeed._tickHandlers[i](id, App.prices[id]); }
+      catch(e){ console.warn('🔴 tick listener error:', e.message); }
+    }
+  },
+
+  /* ------------------------------------------------------------------
+     Demo mode bar generator (ONLY used when the user enables DEMO)
+     ------------------------------------------------------------------ */
+  generateDemoBars(symbol, interval, limit){
+    const seedBase = symbol === 'XAUUSD' ? 2350 : (symbol === 'NAS100' ? 18200 : 1.0850);
+    const vol = symbol === 'EURUSD' ? 0.0006 : (symbol === 'XAUUSD' ? 4 : 60);
+    const stepMs = DataFeed.intervalMs(interval);
+    const now = Date.now();
+    const bars = [];
+    let price = seedBase;
+
+    for (let i = limit - 1; i >= 0; i--){
+      const t = now - i * stepMs;
+      const drift = (Math.random() - 0.5) * vol * 2;
+      const o = price;
+      const c = Math.max(0.0001, o + drift);
+      const h = Math.max(o, c) + Math.random() * vol * 0.6;
+      const l = Math.min(o, c) - Math.random() * vol * 0.6;
+      bars.push({ t: t, o: o, h: h, l: l, c: c, v: Math.round(Math.random() * 1000) });
+      price = c;
+    }
+    return bars;
+  },
+
+  intervalMs(interval){
+    const map = {
+      '1min': 60000, '5min': 300000, '15min': 900000,
+      '30min': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000
+    };
+    return map[interval] || 900000;
+  },
+
+  /* ------------------------------------------------------------------
+     Candle refresh (every 30s)
+     ------------------------------------------------------------------ */
+  async refreshCandles(tf){
+    const interval = tf || App.timeframe;
+    let anyFailure = false;
+
+    for (let i = 0; i < INSTRUMENTS.length; i++){
+      const inst = INSTRUMENTS[i];
+      const sym = App.resolved[inst.id];
+      if (!sym) continue;
+
+      try{
+        const bars = await DataFeed.fetchCandles(sym, interval, 300);
+        if (bars && bars.length >= 50){
+          App.candles[inst.id] = { bars: bars, ts: Date.now(), tf: interval, symbol: sym };
+        }
+      }catch(err){
+        anyFailure = true;
+        console.warn('🔴 candle refresh failed for ' + inst.id + ': ' + err.message);
+      }
+    }
+    DataFeed._lastCandleFetch = Date.now();
+    return !anyFailure;
+  },
+
+  /* ------------------------------------------------------------------
+     REST latest-price fallback (every 5s)
+     ------------------------------------------------------------------ */
+  async pollLatest(){
+    if (App.settings.demo){
+      // In demo mode synthesize a small random walk around the last close.
+      for (let i = 0; i < INSTRUMENTS.length; i++){
+        const inst = INSTRUMENTS[i];
+        const base = App.priceOf(inst.id);
+        if (!U.isNum(base)) continue;
+        const vol = inst.id === 'EURUSD' ? 0.0003 : (inst.id === 'XAUUSD' ? 2 : 25);
+        const next = base + (Math.random() - 0.5) * vol;
+        DataFeed.applyPrice(inst.id, next, next, next, Date.now());
+      }
+      return;
+    }
+
+    try{
+      const symbols = INSTRUMENTS.map(function (inst) {
+        return App.resolved[inst.id] || inst.id;
+      });
+      const data = await DataFeed.fetchLatest(symbols);
+      DataFeed.ingestLatest(data);
+    }catch(err){
+      console.warn('🔴 latest-price poll failed: ' + err.message);
+    }
+  },
+
+  /* Accept several plausible REST response shapes. */
+  ingestLatest(data){
+    if (!data) return;
+    let arr = [];
+
+    if (Array.isArray(data)) arr = data;
+    else if (data.quotes && Array.isArray(data.quotes)) arr = data.quotes;
+    else if (data.data && Array.isArray(data.data)) arr = data.data;
+    else if (typeof data === 'object'){
+      // { XAUUSD: {...}, NAS100: {...} }
+      const keys = Object.keys(data);
+      for (let i = 0; i < keys.length; i++){
+        const v = data[keys[i]];
+        if (v && typeof v === 'object') arr.push(Object.assign({ symbol: keys[i] }, v));
+      }
+    }
+
+    for (let i = 0; i < arr.length; i++){
+      const q = arr[i];
+      if (!q || typeof q !== 'object') continue;
+      const sym = q.symbol || q.s || q.Symbol || q.ticker;
+      if (!sym) continue;
+      const id = DataFeed.mapToInstrument(String(sym).toUpperCase());
+      if (!id) continue;
+      const bid = U.num(q.bid !== undefined ? q.bid : q.b);
+      const ask = U.num(q.ask !== undefined ? q.ask : q.a);
+      let mid = U.num(q.mid !== undefined ? q.mid : (q.m !== undefined ? q.m : q.price));
+      if (mid === null){
+        if (bid !== null && ask !== null) mid = (bid + ask) / 2;
+        else if (bid !== null) mid = bid;
+        else if (ask !== null) mid = ask;
+      }
+      if (mid === null) continue;
+      DataFeed.applyPrice(id, bid, ask, mid, q.time);
+    }
+  }
+};
+
+/* ============================================================================
+   6) ChartEngine — TradingView widget + lightweight-charts native chart
+   ========================================================================= */
+const ChartEngine = {
+
+  tvWidget: null,
+  native: null,        // { chart, candle, ema21, ema50 }
+  priceLines: [],
+  _resizeObserver: null,
+
+  /* -------------------- TradingView -------------------- */
+  loadTvScript(cb){
+    if (window.TradingView){ cb(); return; }
+    if (App._tvLoading){ App._tvQueue.push(cb); return; }
+
+    App._tvLoading = true;
+    App._tvQueue = [cb];
+
+    const s = document.createElement('script');
+    s.src = 'https://s3.tradingview.com/tv.js';
+    s.async = true;
+    s.onload = function (){
+      App._tvLoading = false;
+      const q = App._tvQueue.slice();
+      App._tvQueue = [];
+      for (let i = 0; i < q.length; i++){ try{ q[i](); }catch(e){ console.warn('🔴 tv cb', e.message); } }
+    };
+    s.onerror = function (){
+      App._tvLoading = false;
+      App._tvQueue = [];
+      console.warn('🔴 TradingView tv.js failed to load (network/CSP).');
+      const empty = U.$('#tvEmpty');
+      if (empty){
+        empty.style.display = 'grid';
+        empty.textContent = '⚠️ تعذّر تحميل مخطط TradingView — تحقّق من الاتصال أو مانع الإعلانات';
+      }
+    };
+    document.head.appendChild(s);
+  },
+
+  initTV(){
+    const inst = App.getInstrument(App.activeSymbol);
+    if (!inst) return;
+    const tf = App.tfMeta(App.timeframe);
+
+    const empty = U.$('#tvEmpty');
+    const container = U.$('#tv_chart');
+    if (!container) return;
+    container.innerHTML = '';
+
+    ChartEngine.loadTvScript(function () {
+      try{
+        ChartEngine.tvWidget = new window.TradingView.widget({
+          container_id: 'tv_chart',
+          symbol: inst.tv,
+          interval: tf.tv,
+          theme: 'dark',
+          style: '1',
+          locale: 'ar',
+          autosize: true,
+          hide_side_toolbar: false,
+          allow_symbol_change: false,
+          hide_top_toolbar: false,
+          save_image: false,
+          studies: ['RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
+          overrides: {
+            'paneProperties.background': '#0f1421',
+            'paneProperties.backgroundType': 'solid',
+            'paneProperties.vertGridProperties.color': '#1f2937',
+            'paneProperties.horzGridProperties.color': '#1f2937',
+            'scalesProperties.textColor': '#6b7280',
+            'mainSeriesProperties.candleStyle.upColor': '#00ffa3',
+            'mainSeriesProperties.candleStyle.downColor': '#ff3b5c',
+            'mainSeriesProperties.candleStyle.borderUpColor': '#00ffa3',
+            'mainSeriesProperties.candleStyle.borderDownColor': '#ff3b5c',
+            'mainSeriesProperties.candleStyle.wickUpColor': '#00ffa3',
+            'mainSeriesProperties.candleStyle.wickDownColor': '#ff3b5c'
+          }
+        });
+        if (empty) empty.style.display = 'none';
+        console.log('🟢 TradingView widget created: ' + inst.tv + ' @ ' + tf.tv);
+      }catch(e){
+        console.warn('🔴 TradingView widget error: ' + e.message);
+        if (empty){
+          empty.style.display = 'grid';
+          empty.textContent = '⚠️ خطأ في تحميل مخطط TradingView';
+        }
+      }
+    });
+  },
+
+  updateTVSymbol(){
+    const inst = App.getInstrument(App.activeSymbol);
+    const tf = App.tfMeta(App.timeframe);
+    const lbl = U.$('#tvSymbolLabel');
+    if (lbl && inst) lbl.textContent = inst.tv + ' · ' + tf.label;
+    ChartEngine.initTV();
+  },
+
+  /* -------------------- lightweight-charts -------------------- */
+
+  /* Feature-detect between lightweight-charts v4 and v5 APIs. */
+  addSeries(chart, type, opts){
+    const LWC = window.LightweightCharts;
+    if (typeof chart.addCandlestickSeries === 'function'){
+      if (type === 'candle') return chart.addCandlestickSeries(opts);
+      if (type === 'line') return chart.addLineSeries(opts);
+    }
+    if (LWC && typeof chart.addSeries === 'function'){
+      if (type === 'candle' && LWC.CandlestickSeries) return chart.addSeries(LWC.CandlestickSeries, opts);
+      if (type === 'line' && LWC.LineSeries) return chart.addSeries(LWC.LineSeries, opts);
+    }
+    return null;
+  },
+
+  initNative(){
+    const LWC = window.LightweightCharts;
+    const container = U.$('#native_chart');
+    if (!container) return;
+
+    if (!LWC){
+      const empty = U.$('#nativeEmpty');
+      if (empty){
+        empty.style.display = 'grid';
+        empty.textContent = '⚠️ تعذّر تحميل مكتبة الرسوم البيانية';
+      }
+      return;
+    }
+
+    try{
+      container.innerHTML = '';
+
+      const chart = LWC.createChart(container, {
+        width: container.clientWidth || 600,
+        height: 420,
+        layout: {
+          background: { type: 'solid', color: '#0f1421' },
+          textColor: '#6b7280',
+          fontFamily: "'Inter', monospace"
+        },
+        grid: {
+          vertLines: { color: 'rgba(31,41,55,.55)' },
+          horzLines: { color: 'rgba(31,41,55,.55)' }
+        },
+        rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.08, bottom: 0.08 } },
+        timeScale: { borderColor: '#1f2937', timeVisible: true, secondsVisible: false },
+        crosshair: {
+          mode: (LWC.CrosshairMode && LWC.CrosshairMode.Normal) ? LWC.CrosshairMode.Normal : 0,
+          vertLine: { color: '#334155', labelBackgroundColor: '#1f2937' },
+          horzLine: { color: '#334155', labelBackgroundColor: '#1f2937' }
+        },
+        handleScale: { axisPressedMouseMove: true },
+        localization: {
+          locale: 'ar',
+          priceFormatter: function (p) { return Number(p).toFixed(2); }
+        }
+      });
+
+      const candle = ChartEngine.addSeries(chart, 'candle', {
+        upColor: '#00ffa3', downColor: '#ff3b5c',
+        borderUpColor: '#00ffa3', borderDownColor: '#ff3b5c',
+        wickUpColor: '#00ffa3', wickDownColor: '#ff3b5c',
+        priceLineVisible: true,
+        priceLineColor: '#334155'
+      });
+
+      const ema21 = ChartEngine.addSeries(chart, 'line', {
+        color: '#ffb020', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        crosshairMarkerVisible: false
+      });
+
+      const ema50 = ChartEngine.addSeries(chart, 'line', {
+        color: '#3b82f6', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        crosshairMarkerVisible: false
+      });
+
+      ChartEngine.native = {
+        chart: chart,
+        candle: candle,
+        ema21: ema21,
+        ema50: ema50
+      };
+
+      // Responsive resize
+      if (typeof ResizeObserver !== 'undefined'){
+        ChartEngine._resizeObserver = new ResizeObserver(function () {
+          try{
+            if (ChartEngine.native && container.clientWidth){
+              ChartEngine.native.chart.applyOptions({ width: container.clientWidth });
+            }
+          }catch(e){ /* silent */ }
+        });
+        ChartEngine._resizeObserver.observe(container);
+      } else {
+        window.addEventListener('resize', function () {
+          try{
+            if (ChartEngine.native && container.clientWidth){
+              ChartEngine.native.chart.applyOptions({ width: container.clientWidth });
+            }
+          }catch(e){ /* silent */ }
+        });
+      }
+
+      console.log('🟢 native chart initialized');
+    }catch(e){
+      console.error('🔴 native chart init failed: ' + e.message);
+    }
+  },
+
+  /* Draw candles + EMAs + signal levels */
+  renderNative(symbolId, signal){
+    if (!ChartEngine.native) return;
+    const c = App.candles[symbolId];
+    if (!c || !c.bars || c.bars.length < 3) return;
+
+    const inst = App.getInstrument(symbolId);
+    const digits = inst ? inst.digits : 2;
+
+    try{
+      const bars = c.bars;
+      const candleData = bars.map(function (b) {
+        return { time: Math.floor(b.t / 1000), open: b.o, high: b.h, low: b.l, close: b.c };
+      });
+
+      ChartEngine.native.candle.setData(candleData);
+
+      const closes = bars.map(function (b) { return b.c; });
+      const e21 = Indicators.ema(closes, 21);
+      const e50 = Indicators.ema(closes, 50);
+
+      const line21 = [], line50 = [];
+      for (let i = 0; i < bars.length; i++){
+        const t = Math.floor(bars[i].t / 1000);
+        if (U.isNum(e21[i])) line21.push({ time: t, value: e21[i] });
+        if (U.isNum(e50[i])) line50.push({ time: t, value: e50[i] });
+      }
+
+      ChartEngine.native.ema21.setData(line21);
+      ChartEngine.native.ema50.setData(line50);
+
+      // Price formatter for this instrument
+      ChartEngine.native.chart.applyOptions({
+        localization: {
+          locale: 'ar',
+          priceFormatter: function (p) { return Number(p).toFixed(digits); }
+        }
+      });
+
+      ChartEngine.drawLevels(signal);
+      ChartEngine.native.chart.timeScale().fitContent();
+
+      const empty = U.$('#nativeEmpty');
+      if (empty) empty.style.display = 'none';
+
+    }catch(e){
+      console.warn('🔴 renderNative failed: ' + e.message);
+    }
+  },
+
+  /* Horizontal Entry / SL / TP lines for the active signal */
+  drawLevels(signal){
+    if (!ChartEngine.native) return;
+
+    // Remove old lines
+    for (let i = 0; i < ChartEngine.priceLines.length; i++){
+      try{ ChartEngine.native.candle.removePriceLine(ChartEngine.priceLines[i]); }
+      catch(e){ /* silent */ }
+    }
+    ChartEngine.priceLines = [];
+
+    if (!signal) return;
+
+    const defs = [
+      { price: signal.entry, color: '#60a5fa', title: 'الدخول', style: 0 },
+      { price: signal.sl,    color: '#ff3b5c', title: 'SL',     style: 2 },
+      { price: signal.tp1,   color: '#00ffa3', title: 'TP1',    style: 2 },
+      { price: signal.tp2,   color: '#00d68f', title: 'TP2',    style: 2 },
+      { price: signal.tp3,   color: '#00b37e', title: 'TP3',    style: 2 }
+    ];
+
+    for (let i = 0; i < defs.length; i++){
+      const d = defs[i];
+      if (!U.isNum(d.price)) continue;
+      try{
+        const line = ChartEngine.native.candle.createPriceLine({
+          price: d.price,
+          color: d.color,
+          lineWidth: 1,
+          lineStyle: d.style,
+          axisLabelVisible: true,
+          title: d.title
+        });
+        ChartEngine.priceLines.push(line);
+      }catch(e){ /* silent */ }
+    }
+  },
+
+  /* Live update of the last candle on every tick */
+  updateLastCandle(symbolId){
+    if (!ChartEngine.native) return;
+    if (symbolId !== App.activeSymbol) return;
+
+    const c = App.candles[symbolId];
+    if (!c || !c.bars || !c.bars.length) return;
+
+    const last = c.bars[c.bars.length - 1];
+    try{
+      ChartEngine.native.candle.update({
+        time: Math.floor(last.t / 1000),
+        open: last.o, high: last.h, low: last.l, close: last.c
+      });
+    }catch(e){ /* silent — happens when the timestamp is identical */ }
+  },
+
+  setSymbol(symbolId){
+    App.activeSymbol = symbolId;
+    ChartEngine.updateTVSymbol();
+    ChartEngine.renderNative(symbolId, App.signals[symbolId]);
+  },
+
+  setTimeframe(tfId){
+    App.timeframe = tfId;
+    ChartEngine.updateTVSymbol();
+  }
+};
+
+/* ============================================================================
+   7) Journal — localStorage persistence, auto status, stats, export
+   ========================================================================= */
+const Journal = {
+
+  KEY: 'tradeRadarJournal',
+  entries: [],
+  filter: 'all',
+  sortKey: 'ts',
+  sortDir: 'desc',
+
+  load(){
+    try{
+      const raw = localStorage.getItem(Journal.KEY);
+      if (!raw){ Journal.entries = []; return; }
+      const parsed = JSON.parse(raw);
+      Journal.entries = Array.isArray(parsed) ? parsed : [];
+      console.log('🔵 journal loaded: ' + Journal.entries.length + ' entries');
+    }catch(e){
+      console.warn('🔴 journal load failed: ' + e.message);
+      Journal.entries = [];
+    }
+  },
+
+  save(){
+    try{
+      localStorage.setItem(Journal.KEY, JSON.stringify(Journal.entries));
+    }catch(e){
+      console.warn('🔴 journal save failed: ' + e.message);
+    }
+  },
+
+  /**
+   * Add a new trade from a signal (only score >= settings.minScore).
+   * Deduplicates: skips if an OPEN trade already exists for the same
+   * symbol + direction + entry price (within a small tolerance).
+   */
+  addFromSignal(signal){
+    if (!signal) return null;
+    if (signal.score < App.settings.minScore) return null;
+
+    const inst = App.getInstrument(signal.symbol);
+    if (!inst) return null;
+
+    for (let i = 0; i < Journal.entries.length; i++){
+      const e = Journal.entries[i];
+      if (e.symbol === signal.symbol && e.status !== 'sl' && e.status !== 'tp3'){
+        if (e.direction === signal.direction &&
+            U.isNum(e.entry) && U.isNum(signal.entry) &&
+            Math.abs(e.entry - signal.entry) < (signal.atr * 0.35)){
+          return null; // duplicate
+        }
+      }
+    }
+
+    const sizing = Strategy.positionSize(inst, signal.entry, signal.sl);
+
+    const entry = {
+      id: U.uid(),
+      timestamp: Date.now(),
+      symbol: signal.symbol,
+      direction: signal.direction,
+      entry: signal.entry,
+      sl: signal.sl,
+      tp1: signal.tp1,
+      tp2: signal.tp2,
+      tp3: signal.tp3,
+      score: signal.score,
+      grade: signal.grade,
+      atr: signal.atr,
+      reasons: signal.reasons.slice(),
+      lots: sizing.lots,
+      riskAmount: sizing.riskAmount,
+      pipSize: inst.pipSize,
+      pipValuePerLot: sizing.pipValuePerLot,
+      status: 'open',          // open | tp1 | tp2 | tp3 | sl
+      hits: { tp1: false, tp2: false, tp3: false },
+      weakening: false,
+      exitPrice: null,
+      closedAt: null,
+      pnl: null,
+      pnlPips: null,
+      r: null
+    };
+
+    Journal.entries.unshift(entry);
+    Journal.save();
+    UI.renderJournal();
+    console.log('🟢 trade opened: ' + entry.direction + ' ' + entry.symbol + ' @ ' + U.fmt(entry.entry, inst.digits) + ' (score ' + entry.score + ')');
+    return entry;
+  },
+
+  /**
+   * Update every open trade for a symbol against the latest tick price.
+   * Handles TP1/TP2/TP3 partial hits and SL.
+   */
+  onTick(symbolId, mid){
+    if (!U.isNum(mid)) return;
+    const inst = App.getInstrument(symbolId);
+    if (!inst) return;
+
+    let changed = false;
+
+    for (let i = 0; i < Journal.entries.length; i++){
+      const e = Journal.entries[i];
+      if (e.symbol !== symbolId) continue;
+      if (e.status === 'sl' || e.status === 'tp3') continue;
+
+      const isBuy = e.direction === 'BUY';
+      const hit = function (level){
+        return isBuy ? mid >= level : mid <= level;
+      };
+      const stopped = isBuy ? mid <= e.sl : mid >= e.sl;
+
+      // 1) Stop loss first — it always wins ties for safety.
+      if (stopped){
+        e.status = 'sl';
+        e.exitPrice = e.sl;
+        e.closedAt = Date.now();
+        changed = true;
+        console.log('🔴 SL hit: ' + e.symbol + ' ' + e.direction);
+        UI.toast('❌ ضرب وقف الخسارة — ' + e.symbol + ' ' + e.direction, 'err');
+        continue;
+      }
+
+      // 2) Take profits (sequential)
+      if (!e.hits.tp1 && hit(e.tp1)){
+        e.hits.tp1 = true;
+        e.status = 'tp1';
+        changed = true;
+        UI.toast('✅ تحقق الهدف الأول TP1 — ' + e.symbol, 'ok');
+      }
+      if (!e.hits.tp2 && hit(e.tp2)){
+        e.hits.tp2 = true;
+        e.status = 'tp2';
+        changed = true;
+        UI.toast('✅ تحقق الهدف الثاني TP2 — ' + e.symbol, 'ok');
+      }
+      if (!e.hits.tp3 && hit(e.tp3)){
+        e.hits.tp3 = true;
+        e.status = 'tp3';
+        e.exitPrice = e.tp3;
+        e.closedAt = Date.now();
+        changed = true;
+        UI.toast('🎯 تحقق الهدف الثالث TP3 — ' + e.symbol, 'ok');
+      }
+
+      // If TP3 closed the trade we're done with it.
+      if (e.status === 'tp3') continue;
+
+      // 3) Mark-to-market P/L for still-open positions
+      e.exitPrice = mid;
+      const dist = isBuy ? (mid - e.entry) : (e.entry - mid);
+      e.pnlPips = dist / inst.pipSize;
+      const pv = U.isNum(e.pipValuePerLot) ? e.pipValuePerLot : (inst.pipSize * inst.valuePerUnit);
+      const lots = U.isNum(e.lots) ? e.lots : 0;
+      e.pnl = e.pnlPips * pv * lots;
+      e.r = (U.isNum(e.riskAmount) && e.riskAmount > 0) ? (e.pnl / e.riskAmount) : null;
+      changed = true;
+    }
+
+    if (changed) Journal.renderSoon();
+  },
+
+  /* Update the "weakening" flag when a live score is available. */
+  markWeakening(symbolId, score){
+    let changed = false;
+    for (let i = 0; i < Journal.entries.length; i++){
+      const e = Journal.entries[i];
+      if (e.symbol !== symbolId) continue;
+      if (e.status === 'sl' || e.status === 'tp3') continue;
+      const weak = U.isNum(score) && score < 50;
+      if (e.weakening !== weak){ e.weakening = weak; changed = true; }
+    }
+    if (changed) Journal.renderSoon();
+  },
+
+  /* Throttled re-render so a stream of ticks doesn't thrash the DOM. */
+  _renderTimer: null,
+  renderSoon(){
+    if (Journal._renderTimer) return;
+    Journal._renderTimer = setTimeout(function () {
+      Journal._renderTimer = null;
+      UI.renderJournal();
+    }, 600);
+  },
+
+  clear(){
+    Journal.entries = [];
+    Journal.save();
+    UI.renderJournal();
+    console.log('🔵 journal cleared');
+  },
+
+  getFiltered(){
+    const f = Journal.filter;
+    let list = Journal.entries.slice();
+
+    if (f === 'open') list = list.filter(function (e) { return e.status === 'open' || e.status === 'tp1' || e.status === 'tp2'; });
+    else if (f === 'closed') list = list.filter(function (e) { return e.status === 'sl' || e.status === 'tp3'; });
+    else if (f === 'win') list = list.filter(function (e) { return U.isNum(e.pnl) && e.pnl > 0; });
+    else if (f === 'loss') list = list.filter(function (e) { return U.isNum(e.pnl) && e.pnl < 0; });
+    else if (f.indexOf('sym:') === 0){
+      const sym = f.slice(4);
+      list = list.filter(function (e) { return e.symbol === sym; });
+    }
+
+    const key = Journal.sortKey, dir = Journal.sortDir === 'asc' ? 1 : -1;
+    list.sort(function (a, b) {
+      let av = a[key], bv = b[key];
+      if (key === 'status'){ av = Journal.statusRank(a); bv = Journal.statusRank(b); }
+      const an = U.num(av), bn = U.num(bv);
+      if (an !== null && bn !== null) return (an - bn) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+    return list;
+  },
+
+  statusRank(e){
+    if (e.status === 'tp3') return 5;
+    if (e.status === 'tp2') return 4;
+    if (e.status === 'tp1') return 3;
+    if (e.status === 'sl') return 2;
+    return 1;
+  },
+
+  /* Aggregate performance statistics. */
+  stats(){
+    const closed = Journal.entries.filter(function (e) {
+      return U.isNum(e.pnl) && (e.status === 'sl' || e.status === 'tp3' || e.status === 'tp1' || e.status === 'tp2');
+    });
+    const resolved = Journal.entries.filter(function (e) {
+      return e.status === 'sl' || e.status === 'tp3';
+    });
+
+    let wins = 0, losses = 0, grossProfit = 0, grossLoss = 0;
+    let best = null, worst = null, totalR = 0, rCount = 0;
+
+    for (let i = 0; i < resolved.length; i++){
+      const e = resolved[i];
+      const pnl = U.num(e.pnl) || 0;
+      if (pnl > 0){ wins++; grossProfit += pnl; }
+      else if (pnl < 0){ losses++; grossLoss += Math.abs(pnl); }
+      if (best === null || pnl > best) best = pnl;
+      if (worst === null || pnl < worst) worst = pnl;
+      if (U.isNum(e.r)){ totalR += e.r; rCount++; }
+    }
+
+    const totalResolved = wins + losses;
+    const winRate = totalResolved > 0 ? (wins / totalResolved) * 100 : null;
+    const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? Infinity : null);
+    const avgR = rCount > 0 ? totalR / rCount : null;
+
+    // Max drawdown over the closed-trade equity curve (chronological)
+    const chrono = resolved.slice().sort(function (a, b) {
+      return (a.closedAt || a.timestamp) - (b.closedAt || b.timestamp);
+    });
+    let equity = 0, peak = 0, maxDD = 0;
+    for (let i = 0; i < chrono.length; i++){
+      equity += (U.num(chrono[i].pnl) || 0);
+      if (equity > peak) peak = equity;
+      const dd = peak - equity;
+      if (dd > maxDD) maxDD = dd;
+    }
+
+    return {
+      total: Journal.entries.length,
+      open: Journal.entries.filter(function (e) { return e.status === 'open' || e.status === 'tp1' || e.status === 'tp2'; }).length,
+      closed: resolved.length,
+      winRate: winRate,
+      totalR: rCount > 0 ? totalR : null,
+      best: best,
+      worst: worst,
+      avgR: avgR,
+      profitFactor: profitFactor,
+      maxDD: maxDD,
+      netPnl: grossProfit - grossLoss
+    };
+  },
+
+  toCSV(){
+    const cols = ['timestamp','id','symbol','direction','entry','sl','tp1','tp2','tp3','score','status','lots','pnlPips','pnl','r','exitPrice','closedAt','reasons'];
+    const rows = [cols.join(',')];
+    const list = Journal.getFiltered();
+
+    for (let i = 0; i < list.length; i++){
+      const e = list[i];
+      const row = cols.map(function (c) {
+        let v = e[c];
+        if (c === 'timestamp' || c === 'closedAt'){
+          v = v ? new Date(v).toISOString() : '';
+        }
+        if (c === 'reasons') v = Array.isArray(e.reasons) ? e.reasons.join(' | ') : '';
+        if (v === null || v === undefined) v = '';
+        v = String(v).replace(/"/g, '""');
+        return '"' + v + '"';
+      });
+      rows.push(row.join(','));
+    }
+    return '\uFEFF' + rows.join('\n'); // BOM for Excel UTF-8
+  },
+
+  toJSON(){
+    return JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      app: 'TradeRadar Pro',
+      stats: Journal.stats(),
+      trades: Journal.getFiltered()
+    }, null, 2);
+  }
+};
+
+/* ============================================================================
+   8) UI — rendering + events
+   ========================================================================= */
+const UI = {
+
+  _flashTimers: {},
+  _sparkCache: {},
+
+  /* -------------------- Boot the static shell -------------------- */
+  init(){
+    UI.renderTfBar();
+    UI.renderCards();
+    UI.renderFilters();
+    UI.renderJournal();
+    UI.renderStatus(App.status);
+    UI.bindEvents();
+    UI.tickClock();
+    setInterval(UI.tickClock, 1000);
+  },
+
+  tickClock(){
+    const el = U.$('#clock');
+    if (el) el.textContent = U.utcNow();
+  },
+
+  /* -------------------- Connection status -------------------- */
+  renderStatus(status){
+    const dot = U.$('#statusDot');
+    const text = U.$('#statusText');
+    const banner = U.$('#offlineBanner');
+    const liveTag = U.$('#liveTag');
+    if (!dot || !text) return;
+
+    dot.className = 'dot';
+    if (status === 'connected'){
+      dot.classList.add('connected');
+      text.textContent = 'متصل — مباشر';
+      if (banner) banner.classList.remove('show');
+      if (liveTag) liveTag.classList.add('show');
+    } else if (status === 'reconnecting'){
+      dot.classList.add('reconnecting');
+      text.textContent = 'إعادة الاتصال…';
+      if (banner) banner.classList.add('show');
+      if (liveTag) liveTag.classList.remove('show');
+    } else {
+      dot.classList.add('offline');
+      text.textContent = 'غير متصل';
+      if (banner) banner.classList.add('show');
+      if (liveTag) liveTag.classList.remove('show');
+    }
+  },
+
+  /* -------------------- Timeframe bar -------------------- */
+  renderTfBar(){
+    const bar = U.$('#tfBar');
+    if (!bar) return;
+    bar.innerHTML = TIMEFRAMES.map(function (tf) {
+      return '<button class="tf-btn' + (tf.id === App.timeframe ? ' active' : '') +
+             '" data-tf="' + tf.id + '">' + tf.label + '</button>';
+    }).join('');
+  },
+
+  /* -------------------- Symbol cards -------------------- */
+  renderCards(){
+    const wrap = U.$('#symbolCards');
+    if (!wrap) return;
+
+    wrap.innerHTML = INSTRUMENTS.map(function (inst) {
+      return '' +
+        '<div class="card' + (inst.id === App.activeSymbol ? ' active' : '') + '" data-sym="' + inst.id + '" id="card-' + inst.id + '">' +
+          '<div class="card-head">' +
+            '<div>' +
+              '<div class="card-sym">' + inst.id + '</div>' +
+              '<div class="card-sym-ar">' + U.esc(inst.ar) + '</div>' +
+            '</div>' +
+            '<div id="badge-' + inst.id + '"><span class="badge none">— لا إشارة —</span></div>' +
+          '</div>' +
+          '<div class="card-price num" id="price-' + inst.id + '">—</div>' +
+          '<div class="card-sub">' +
+            '<span class="chg flat" id="chg-' + inst.id + '">—</span>' +
+            '<span style="color:var(--muted)" id="spread-' + inst.id + '"></span>' +
+          '</div>' +
+          '<svg class="spark" id="spark-' + inst.id + '" preserveAspectRatio="none" viewBox="0 0 100 34"></svg>' +
+          '<div class="card-foot">' +
+            '<span id="tf-' + inst.id + '">' + App.tfMeta(App.timeframe).label + '</span>' +
+            '<span class="score-pill" id="score-' + inst.id + '" style="color:var(--muted)">—</span>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  },
+
+  /* Update a single card from live data */
+  renderCard(symbolId){
+    const inst = App.getInstrument(symbolId);
+    if (!inst) return;
+
+    const priceEl = U.$('#price-' + symbolId);
+    const chgEl = U.$('#chg-' + symbolId);
+    const spreadEl = U.$('#spread-' + symbolId);
+    const badgeEl = U.$('#badge-' + symbolId);
+    const scoreEl = U.$('#score-' + symbolId);
+    const sparkEl = U.$('#spark-' + symbolId);
+    const cardEl = U.$('#card-' + symbolId);
+    const tfEl = U.$('#tf-' + symbolId);
+
+    const price = App.priceOf(symbolId);
+
+    /* Price + flash */
+    if (priceEl){
+      if (U.isNum(price)){
+        priceEl.textContent = U.fmt(price, inst.digits);
+        const p = App.prices[symbolId];
+        if (p && U.isNum(p.prevMid) && p.prevMid !== price){
+          const cls = price > p.prevMid ? 'up' : 'down';
+          priceEl.classList.remove('up', 'down');
+          priceEl.classList.add(cls);
+          clearTimeout(UI._flashTimers['p' + symbolId]);
+          UI._flashTimers['p' + symbolId] = setTimeout(function () {
+            priceEl.classList.remove('up', 'down');
+          }, 520);
+        }
+      } else {
+        priceEl.textContent = '—';
+      }
+    }
+
+    /* % change vs. ~24h ago using loaded candles */
+    if (chgEl){
+      const c = App.candles[symbolId];
+      let pct = null;
+      if (c && c.bars && c.bars.length > 5 && U.isNum(price)){
+        const stepMs = DataFeed.intervalMs(c.tf || App.timeframe);
+        const targetT = Date.now() - 86400000;
+        let refBar = c.bars[0];
+        for (let i = c.bars.length - 1; i >= 0; i--){
+          if (c.bars[i].t <= targetT){ refBar = c.bars[i]; break; }
+        }
+        const ref = U.num(refBar.c);
+        if (U.isNum(ref) && ref !== 0) pct = ((price - ref) / ref) * 100;
+      }
+      if (pct === null){
+        chgEl.className = 'chg flat';
+        chgEl.textContent = '—';
+      } else {
+        chgEl.className = 'chg ' + (pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat');
+        chgEl.textContent = U.fmtSigned(pct, 2) + '%';
+        chgEl.title = 'التغير خلال آخر 24 ساعة (أو أقدم شمعة متاحة)';
+      }
+    }
+
+    /* Spread */
+    if (spreadEl){
+      const p = App.prices[symbolId];
+      if (p && U.isNum(p.bid) && U.isNum(p.ask)){
+        const sp = Math.abs(p.ask - p.bid);
+        spreadEl.textContent = 'سبريد ' + U.fmt(sp, inst.digits);
+      } else {
+        spreadEl.textContent = '';
+      }
+    }
+
+    /* Signal badge */
+    const sig = App.signals[symbolId];
+    if (badgeEl){
+      if (sig && sig.score >= App.settings.minScore){
+        const cls = sig.score >= 70 ? 'strong' : 'med';
+        const arrow = sig.direction === 'BUY' ? '▲' : '▼';
+        const dirCls = sig.direction === 'BUY' ? 'buy' : 'sell';
+        badgeEl.innerHTML = '<span class="badge ' + dirCls + ' ' + cls + '">' + arrow + ' ' + sig.direction + ' · ' + sig.score + '</span>';
+      } else {
+        badgeEl.innerHTML = '<span class="badge none">— لا إشارة —</span>';
+      }
+    }
+
+    /* Score text */
+    if (scoreEl){
+      if (sig){
+        scoreEl.textContent = sig.score + '/100';
+        scoreEl.style.color = sig.score >= 70 ? 'var(--green)'
+                            : sig.score >= 55 ? 'var(--orange)'
+                            : 'var(--muted)';
+      } else {
+        scoreEl.textContent = '—';
+        scoreEl.style.color = 'var(--muted)';
+      }
+    }
+
+    if (tfEl) tfEl.textContent = App.tfMeta(App.timeframe).label;
+
+    /* Sparkline */
+    if (sparkEl) UI.renderSparkline(sparkEl, symbolId, inst);
+
+    /* Active state */
+    if (cardEl) cardEl.classList.toggle('active', symbolId === App.activeSymbol);
+  },
+
+  renderAllCards(){
+    for (let i = 0; i < INSTRUMENTS.length; i++) UI.renderCard(INSTRUMENTS[i].id);
+  },
+
+  /* Tiny SVG sparkline from the last 40 closes */
+  renderSparkline(svg, symbolId, inst){
+    const c = App.candles[symbolId];
+    if (!c || !c.bars || c.bars.length < 5){ svg.innerHTML = ''; return; }
+
+    const bars = c.bars.slice(-40);
+    const values = bars.map(function (b) { return b.c; });
+    const live = App.priceOf(symbolId);
+    if (U.isNum(live)) values[values.length - 1] = live;
+
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < values.length; i++){
+      if (values[i] < min) min = values[i];
+      if (values[i] > max) max = values[i];
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max === min){
+      svg.innerHTML = '';
+      return;
+    }
+
+    const W = 100, H = 34, pad = 2;
+    const range = max - min;
+    const pts = values.map(function (v, i) {
+      const x = (i / (values.length - 1)) * W;
+      const y = H - pad - ((v - min) / range) * (H - pad * 2);
+      return x.toFixed(2) + ',' + y.toFixed(2);
+    }).join(' ');
+
+    const up = values[values.length - 1] >= values[0];
+    const color = up ? '#00ffa3' : '#ff3b5c';
+    const fillId = 'sf-' + symbolId;
+
+    svg.innerHTML =
+      '<defs><linearGradient id="' + fillId + '" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.28"/>' +
+        '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      '<polygon points="0,34 ' + pts + ' 100,34" fill="url(#' + fillId + ')"/>' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" ' +
+        'stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+  },
+
+  /* -------------------- Signal panel -------------------- */
+  renderSignalPanel(){
+    const panel = U.$('#signalPanel');
+    const label = U.$('#sigSymbolLabel');
+    if (!panel) return;
+
+    const symbolId = App.activeSymbol;
+    const inst = App.getInstrument(symbolId);
+    if (label && inst) label.textContent = symbolId;
+
+    if (!inst) return;
+
+    const sig = App.signals[symbolId];
+    const price = App.priceOf(symbolId);
+
+    if (!sig || sig.score < App.settings.minScore){
+      const hasData = !!(App.candles[symbolId] && App.candles[symbolId].bars.length);
+      const currentScore = sig ? sig.score : null;
+
+      panel.innerHTML =
+        '<div class="no-trade">' +
+          '<div class="big">' + (hasData ? '🛡️' : '⏳') + '</div>' +
+          '<div class="t">' + (hasData ? 'لا توجد صفقة — لا تتوفر تقاطعات كافية' : 'جارٍ تحميل البيانات…') + '</div>' +
+          '<div class="s">' +
+            (hasData
+              ? 'النتيجة الحالية ' + (currentScore === null ? '—' : currentScore + '/100') +
+                ' · الحد الأدنى المطلوب ' + App.settings.minScore
+              : 'يتم احتساب المؤشرات الفنية') +
+          '</div>' +
+          (U.isNum(price) ? '<div style="margin-top:16px;font-family:var(--mono);font-size:22px;color:var(--text)">' + U.fmt(price, inst.digits) + '</div>' : '') +
+          (currentScore !== null ? '<div class="gauge" style="margin-top:14px"><div class="gauge-fill" style="width:' + U.clamp(currentScore, 0, 100) + '%;background:' + UI.scoreColor(currentScore) + '"></div></div>' : '') +
+        '</div>';
+      return;
+    }
+
+    const isBuy = sig.direction === 'BUY';
+    const dirCls = isBuy ? 'buy' : 'sell';
+    const sizing = Strategy.positionSize(inst, sig.entry, sig.sl);
+    const ind = sig.indicators;
+
+    const reasonsHtml = sig.reasons.map(function (r) {
+      return '<li><span class="tick">✔</span><span>' + U.esc(r) + '</span></li>';
+    }).join('');
+
+    const structureLabel = {
+      uptrend: 'صاعد (HH/HL)',
+      downtrend: 'هابط (LH/LL)',
+      range: 'عرضي (Range)'
+    }[ind.structure] || '—';
+
+    panel.innerHTML =
+      '<div class="sig-dir ' + dirCls + '">' +
+        '<div class="sig-dir-main">' +
+          '<div class="sig-arrow">' + (isBuy ? '▲' : '▼') + '</div>' +
+          '<div>' +
+            '<div class="sig-dir-text" style="color:' + (isBuy ? 'var(--green)' : 'var(--red)') + '">' + sig.direction + '</div>' +
+            '<div class="sig-dir-sub">' + (sig.grade === 'STRONG' ? 'إشارة قوية' : 'إشارة متوسطة') + ' · ' + symbolId + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sig-score-box">' +
+          '<div class="sig-score" style="color:' + UI.scoreColor(sig.score) + '">' + sig.score + '</div>' +
+          '<div class="sig-score-label">SCORE / 100</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="gauge"><div class="gauge-fill" style="width:' + U.clamp(sig.score, 0, 100) + '%;background:' + UI.scoreColor(sig.score) + '"></div></div>' +
+
+      '<div class="levels">' +
+        '<div class="level entry"><span class="lbl">الدخول (Entry)</span><span class="val">' + U.fmt(sig.entry, inst.digits) + '</span></div>' +
+        '<div class="level sl"><span class="lbl">وقف الخسارة (SL)</span><span class="val">' + U.fmt(sig.sl, inst.digits) + '</span></div>' +
+        '<div class="level tp"><span class="lbl">الهدف 1 (TP1) <span class="rr">R:R ' + U.fmt(sig.rr.tp1, 2) + ' · إغلاق 50%</span></span><span class="val">' + U.fmt(sig.tp1, inst.digits) + '</span></div>' +
+        '<div class="level tp"><span class="lbl">الهدف 2 (TP2) <span class="rr">R:R ' + U.fmt(sig.rr.tp2, 2) + ' · إغلاق 30%</span></span><span class="val">' + U.fmt(sig.tp2, inst.digits) + '</span></div>' +
+        '<div class="level tp"><span class="lbl">الهدف 3 (TP3) <span class="rr">R:R ' + U.fmt(sig.rr.tp3, 2) + ' · إغلاق 20% + تتبّع</span></span><span class="val">' + U.fmt(sig.tp3, inst.digits) + '</span></div>' +
+      '</div>' +
+
+      '<div class="subhead">حاسبة المخاطرة</div>' +
+      '<div class="risk-box">' +
+        '<div class="risk-row"><span>رصيد الحساب</span><span>$' + U.fmt(App.settings.balance, 2) + '</span></div>' +
+        '<div class="risk-row"><span>المخاطرة (' + U.fmt(App.settings.riskPct, 2) + '%)</span><span>$' + U.fmt(sizing.riskAmount, 2) + '</span></div>' +
+        '<div class="risk-row"><span>حجم المركز (Lots)</span><span>' + (U.isNum(sizing.lots) ? U.fmt(sizing.lots, 3) : '—') + '</span></div>' +
+        '<div class="risk-row"><span>مسافة الوقف</span><span>' + (U.isNum(sizing.slPips) ? U.fmt(sizing.slPips, 1) + ' ' + inst.decimalsNote : '—') + '</span></div>' +
+        '<div class="risk-row"><span>قيمة النقطة / لوت</span><span>$' + (U.isNum(sizing.pipValuePerLot) ? U.fmt(sizing.pipValuePerLot, 2) : '—') + '</span></div>' +
+      '</div>' +
+
+      '<div class="subhead">أسباب الإشارة (' + sig.reasons.length + ')</div>' +
+      '<ul class="reasons">' + (reasonsHtml || '<li><span class="tick">–</span><span>لا توجد</span></li>') + '</ul>' +
+
+      '<div class="subhead">قيم المؤشرات</div>' +
+      '<div class="kv">' +
+        '<div class="kv-item"><span>EMA 9</span><span>' + U.fmt(ind.ema9, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>EMA 21</span><span>' + U.fmt(ind.ema21, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>EMA 50</span><span>' + U.fmt(ind.ema50, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>EMA 200</span><span>' + U.fmt(ind.ema200, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>RSI 14</span><span>' + U.fmt(ind.rsi, 1) + '</span></div>' +
+        '<div class="kv-item"><span>ATR 14</span><span>' + U.fmt(ind.atr, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>MACD</span><span>' + U.fmt(ind.macd, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>MACD Signal</span><span>' + U.fmt(ind.macdSignal, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>Stoch %K</span><span>' + U.fmt(ind.stochK, 1) + '</span></div>' +
+        '<div class="kv-item"><span>Stoch %D</span><span>' + U.fmt(ind.stochD, 1) + '</span></div>' +
+        '<div class="kv-item"><span>BB علوي</span><span>' + U.fmt(ind.bbUpper, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>BB سفلي</span><span>' + U.fmt(ind.bbLower, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>الهيكل</span><span style="font-family:var(--ar)">' + structureLabel + '</span></div>' +
+        '<div class="kv-item"><span>دعم</span><span>' + U.fmt(ind.support, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>مقاومة</span><span>' + U.fmt(ind.resistance, inst.digits) + '</span></div>' +
+        '<div class="kv-item"><span>BOS / CHoCH</span><span style="font-family:var(--ar)">' +
+          (ind.choch ? 'CHoCH ' + (ind.choch === 'BULLISH' ? 'صاعد' : 'هابط') :
+           ind.bos ? 'BOS ' + (ind.bos === 'BULLISH' ? 'صاعد' : 'هابط') : '—') +
+        '</span></div>' +
+      '</div>';
+  },
+
+  scoreColor(score){
+    if (score >= 70) return 'var(--green)';
+    if (score >= 55) return 'var(--orange)';
+    return 'var(--muted)';
+  },
+
+  /* -------------------- Journal -------------------- */
+  renderFilters(){
+    const wrap = U.$('#journalFilters');
+    if (!wrap) return;
+
+    const filters = [
+      { id: 'all', label: 'الكل' },
+      { id: 'open', label: 'مفتوحة' },
+      { id: 'closed', label: 'مغلقة' },
+      { id: 'win', label: 'رابحة' },
+      { id: 'loss', label: 'خاسرة' },
+      { id: 'sym:XAUUSD', label: 'XAUUSD' },
+      { id: 'sym:NAS100', label: 'NAS100' },
+      { id: 'sym:EURUSD', label: 'EURUSD' }
+    ];
+
+    wrap.innerHTML = filters.map(function (f) {
+      return '<button class="chip' + (Journal.filter === f.id ? ' active' : '') +
+             '" data-filter="' + f.id + '">' + f.label + '</button>';
+    }).join('');
+  },
+
+  renderJournal(){
+    const statsWrap = U.$('#journalStats');
+    const body = U.$('#journalBody');
+    if (!body) return;
+
+    const s = Journal.stats();
+
+    if (statsWrap){
+      const pf = s.profitFactor === null ? '—'
+               : (s.profitFactor === Infinity ? '∞' : U.fmt(s.profitFactor, 2));
+      statsWrap.innerHTML =
+        UI.stat('إجمالي الصفقات', String(s.total)) +
+        UI.stat('مفتوحة', String(s.open)) +
+        UI.stat('مغلقة', String(s.closed)) +
+        UI.stat('نسبة الربح', s.winRate === null ? '—' : U.fmt(s.winRate, 1) + '%', s.winRate !== null ? (s.winRate >= 50 ? 'var(--green)' : 'var(--red)') : null) +
+        UI.stat('إجمالي R', s.totalR === null ? '—' : U.fmtSigned(s.totalR, 2) + 'R', s.totalR !== null ? (s.totalR >= 0 ? 'var(--green)' : 'var(--red)') : null) +
+        UI.stat('متوسط R', s.avgR === null ? '—' : U.fmtSigned(s.avgR, 2) + 'R', s.avgR !== null ? (s.avgR >= 0 ? 'var(--green)' : 'var(--red)') : null) +
+        UI.stat('Profit Factor', pf, s.profitFactor !== null && s.profitFactor >= 1 ? 'var(--green)' : 'var(--red)') +
+        UI.stat('أفضل صفقة', s.best === null ? '—' : '$' + U.fmtSigned(s.best, 2), 'var(--green)') +
+        UI.stat('أسوأ صفقة', s.worst === null ? '—' : '$' + U.fmtSigned(s.worst, 2), 'var(--red)') +
+        UI.stat('أقصى تراجع', '$' + U.fmt(s.maxDD, 2), s.maxDD > 0 ? 'var(--red)' : null) +
+        UI.stat('صافي الربح', '$' + U.fmtSigned(s.netPnl, 2), s.netPnl >= 0 ? 'var(--green)' : 'var(--red)');
+    }
+
+    const list = Journal.getFiltered();
+
+    if (!list.length){
+      body.innerHTML = '<tr><td colspan="13" class="empty-row">لا توجد صفقات مطابقة — سيتم تسجيل الإشارات تلقائياً عند تحقق الشروط</td></tr>';
+      return;
+    }
+
+    body.innerHTML = list.map(function (e) {
+      const inst = App.getInstrument(e.symbol);
+      const d = inst ? inst.digits : 2;
+
+      let statusHtml;
+      if (e.status === 'sl'){
+        statusHtml = '<span class="st loss">❌ SL Hit</span>';
+      } else if (e.status === 'tp3'){
+        statusHtml = '<span class="st win">🎯 TP3 Hit</span>';
+      } else if (e.status === 'tp2'){
+        statusHtml = '<span class="st win">✅ TP2 Hit</span>';
+      } else if (e.status === 'tp1'){
+        statusHtml = '<span class="st win">✅ TP1 Hit</span>';
+      } else if (e.weakening){
+        statusHtml = '<span class="st weak">⚠️ إشارة ضعيفة</span>';
+      } else {
+        statusHtml = '<span class="st open">⏳ Open</span>';
+      }
+
+      const pnl = U.num(e.pnl);
+      const pnlCls = pnl === null ? 'pnl-flat' : (pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-flat');
+      const pips = U.num(e.pnlPips);
+      const r = U.num(e.r);
+      const isBuy = e.direction === 'BUY';
+
+      return '<tr>' +
+        '<td>' + U.tsLabel(e.timestamp) + '</td>' +
+        '<td style="font-weight:700">' + U.esc(e.symbol) + '</td>' +
+        '<td><span class="badge ' + (isBuy ? 'buy' : 'sell') + '">' + (isBuy ? '▲ BUY' : '▼ SELL') + '</span></td>' +
+        '<td>' + U.fmt(e.entry, d) + '</td>' +
+        '<td style="color:var(--red)">' + U.fmt(e.sl, d) + '</td>' +
+        '<td style="color:var(--green)">' + U.fmt(e.tp1, d) + '</td>' +
+        '<td style="color:var(--green)">' + U.fmt(e.tp2, d) + '</td>' +
+        '<td style="color:var(--green)">' + U.fmt(e.tp3, d) + '</td>' +
+        '<td>' + U.fmt(e.score, 0) + '</td>' +
+        '<td class="ar">' + statusHtml + '</td>' +
+        '<td class="' + pnlCls + '">' + (pips === null ? '—' : U.fmtSigned(pips, 1)) + '</td>' +
+        '<td class="' + pnlCls + '">' + (pnl === null ? '—' : '$' + U.fmtSigned(pnl, 2)) + '</td>' +
+        '<td class="' + pnlCls + '">' + (r === null ? '—' : U.fmtSigned(r, 2) + 'R') + '</td>' +
+      '</tr>';
+    }).join('');
+  },
+
+  stat(k, v, color){
+    return '<div class="stat"><div class="k">' + U.esc(k) + '</div>' +
+           '<div class="v" style="' + (color ? 'color:' + color : '') + '">' + U.esc(v) + '</div></div>';
+  },
+
+  /* -------------------- Toasts -------------------- */
+  toast(msg, type){
+    const wrap = U.$('#toastWrap');
+    if (!wrap) return;
+    const el = document.createElement('div');
+    el.className = 'toast' + (type === 'err' ? ' err' : type === 'warn' ? ' warn' : '');
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = 'opacity .3s ease, transform .3s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-16px)';
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 320);
+    }, 4200);
+  },
+
+  /* -------------------- Alerts: sound + notifications -------------------- */
+  beep(){
+    if (!App.settings.sound) return;
+    try{
+      if (!App._audioCtx){
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        App._audioCtx = new Ctx();
+      }
+      const ctx = App._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.09);
+
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.34);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.36);
+    }catch(e){
+      console.warn('🔴 audio error:', e.message);
+    }
+  },
+
+  notify(title, body){
+    if (!App.settings.notify) return;
+    try{
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'granted'){
+        new Notification(title, { body: body, tag: 'traderadar', silent: false });
+      }
+    }catch(e){
+      console.warn('🔴 notification error:', e.message);
+    }
+  },
+
+  requestNotifyPermission(){
+    try{
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'default'){
+        Notification.requestPermission().then(function (perm) {
+          console.log('🔵 notification permission: ' + perm);
+        }).catch(function (){ /* ignore */ });
+      }
+    }catch(e){ /* ignore */ }
+  },
+
+  /* Pulse the symbol card for a new strong signal */
+  pulseCard(symbolId){
+    const card = U.$('#card-' + symbolId);
+    if (!card) return;
+    card.classList.remove('pulse');
+    void card.offsetWidth; // force reflow to restart the animation
+    card.classList.add('pulse');
+    setTimeout(function () { card.classList.remove('pulse'); }, 5000);
+  },
+
+  /* -------------------- Modals -------------------- */
+  openModal(id){
+    const m = U.$('#' + id);
+    if (m) m.classList.add('show');
+  },
+
+  closeModal(id){
+    const m = U.$('#' + id);
+    if (m) m.classList.remove('show');
+  },
+
+  confirm(text, onYes){
+    const t = U.$('#confirmText');
+    if (t) t.textContent = text;
+
+    const yes = U.$('#btnConfirmYes');
+    const handler = function (){
+      yes.removeEventListener('click', handler);
+      UI.closeModal('confirmModal');
+      try{ onYes(); }catch(e){ console.warn('🔴 confirm action failed:', e.message); }
+    };
+    // Remove any previous handler by cloning
+    const fresh = yes.cloneNode(true);
+    yes.parentNode.replaceChild(fresh, yes);
+    fresh.addEventListener('click', handler);
+
+    UI.openModal('confirmModal');
+  },
+
+  /* -------------------- Settings modal -------------------- */
+  fillSettingsForm(){
+    const g = function (id) { return U.$('#' + id); };
+    if (g('setBalance')) g('setBalance').value = App.settings.balance;
+    if (g('setRisk')) g('setRisk').value = App.settings.riskPct;
+    if (g('setMinScore')) g('setMinScore').value = App.settings.minScore;
+    if (g('setTimeframe')) g('setTimeframe').value = App.settings.timeframe;
+    if (g('setSound')) g('setSound').checked = !!App.settings.sound;
+    if (g('setNotify')) g('setNotify').checked = !!App.settings.notify;
+    if (g('setDemo')) g('setDemo').checked = !!App.settings.demo;
+  },
+
+  saveSettingsFromForm(){
+    const g = function (id) { return U.$('#' + id); };
+
+    const balance = U.num(g('setBalance') && g('setBalance').value);
+    const risk = U.num(g('setRisk') && g('setRisk').value);
+    const minScore = U.num(g('setMinScore') && g('setMinScore').value);
+    const tf = g('setTimeframe') ? g('setTimeframe').value : App.settings.timeframe;
+
+    if (balance !== null && balance > 0) App.settings.balance = balance;
+    if (risk !== null && risk > 0 && risk <= 100) App.settings.riskPct = risk;
+    if (minScore !== null && minScore >= 0 && minScore <= 100) App.settings.minScore = minScore;
+    if (App.tfMeta(tf)) App.settings.timeframe = tf;
+
+    App.settings.sound = !!(g('setSound') && g('setSound').checked);
+    App.settings.notify = !!(g('setNotify') && g('setNotify').checked);
+
+    const wasDemo = App.settings.demo;
+    App.settings.demo = !!(g('setDemo') && g('setDemo').checked);
+
+    if (App.settings.notify) UI.requestNotifyPermission();
+
+    App.saveSettings();
+
+    // Reflect timeframe change immediately
+    if (App.settings.timeframe !== App.timeframe){
+      App.timeframe = App.settings.timeframe;
+      UI.renderTfBar();
+      ChartEngine.setTimeframe(App.timeframe);
+      App.refreshCandlesNow();
+    }
+
+    // Demo toggle → reload candles
+    if (wasDemo !== App.settings.demo){
+      UI.renderDemoBanner();
+      App.refreshCandlesNow();
+    }
+
+    UI.renderAllCards();
+    UI.renderSignalPanel();
+    UI.renderJournal();
+    UI.closeModal('settingsModal');
+    UI.toast('✅ تم حفظ الإعدادات');
+  },
+
+  renderDemoBanner(){
+    const b = U.$('#demoBanner');
+    if (!b) return;
+    b.classList.toggle('show', !!App.settings.demo);
+  },
+
+  /* -------------------- Event wiring -------------------- */
+  bindEvents(){
+
+    /* Symbol cards + tf buttons — event delegation */
+    document.addEventListener('click', function (ev) {
+      const card = ev.target.closest ? ev.target.closest('[data-sym]') : null;
+      if (card){
+        const sym = card.getAttribute('data-sym');
+        if (sym && sym !== App.activeSymbol){
+          App.activeSymbol = sym;
+          ChartEngine.setSymbol(sym);
+          UI.renderAllCards();
+          UI.renderSignalPanel();
+        }
+        return;
+      }
+
+      const tfBtn = ev.target.closest ? ev.target.closest('[data-tf]') : null;
+      if (tfBtn){
+        const tf = tfBtn.getAttribute('data-tf');
+        if (tf && tf !== App.timeframe){
+          App.timeframe = tf;
+          App.settings.timeframe = tf;
+          App.saveSettings();
+          UI.renderTfBar();
+          UI.renderAllCards();
+          ChartEngine.setTimeframe(tf);
+          App.refreshCandlesNow();
+        }
+        return;
+      }
+
+      const chip = ev.target.closest ? ev.target.closest('[data-filter]') : null;
+      if (chip){
+        Journal.filter = chip.getAttribute('data-filter');
+        UI.renderFilters();
+        UI.renderJournal();
+        return;
+      }
+
+      const sortTh = ev.target.closest ? ev.target.closest('th[data-sort]') : null;
+      if (sortTh){
+        const key = sortTh.getAttribute('data-sort');
+        if (Journal.sortKey === key){
+          Journal.sortDir = Journal.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          Journal.sortKey = key;
+          Journal.sortDir = 'desc';
+        }
+        UI.renderJournal();
+        return;
+      }
+
+      const closer = ev.target.closest ? ev.target.closest('[data-close]') : null;
+      if (closer){
+        UI.closeModal(closer.getAttribute('data-close'));
+        return;
+      }
+
+      // Click on modal backdrop closes it
+      if (ev.target.classList && ev.target.classList.contains('modal')){
+        ev.target.classList.remove('show');
+      }
+    });
+
+    /* Settings */
+    const btnSettings = U.$('#btnSettings');
+    if (btnSettings){
+      btnSettings.addEventListener('click', function () {
+        UI.fillSettingsForm();
+        UI.openModal('settingsModal');
+      });
+    }
+
+    const btnSave = U.$('#btnSaveSettings');
+    if (btnSave) btnSave.addEventListener('click', UI.saveSettingsFromForm);
+
+    /* Exports */
+    const btnCsv = U.$('#btnExportCsv');
+    if (btnCsv){
+      btnCsv.addEventListener('click', function () {
+        if (!Journal.entries.length){ UI.toast('لا توجد صفقات للتصدير', 'warn'); return; }
+        U.download('traderadar-journal-' + new Date().toISOString().slice(0, 10) + '.csv',
+                   Journal.toCSV(), 'text/csv;charset=utf-8');
+        UI.toast('⬇️ تم تصدير CSV');
+      });
+    }
+
+    const btnJson = U.$('#btnExportJson');
+    if (btnJson){
+      btnJson.addEventListener('click', function () {
+        if (!Journal.entries.length){ UI.toast('لا توجد صفقات للتصدير', 'warn'); return; }
+        U.download('traderadar-journal-' + new Date().toISOString().slice(0, 10) + '.json',
+                   Journal.toJSON(), 'application/json;charset=utf-8');
+        UI.toast('⬇️ تم تصدير JSON');
+      });
+    }
+
+    const btnClear = U.$('#btnClearJournal');
+    if (btnClear){
+      btnClear.addEventListener('click', function () {
+        if (!Journal.entries.length){ UI.toast('السجل فارغ بالفعل', 'warn'); return; }
+        UI.confirm('سيتم حذف جميع الصفقات (' + Journal.entries.length + ') نهائياً. هل أنت متأكد؟', function () {
+          Journal.clear();
+          UI.toast('🗑️ تم مسح السجل');
+        });
+      });
+    }
+
+    /* Keyboard: Esc closes modals */
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape'){
+        UI.closeModal('settingsModal');
+        UI.closeModal('confirmModal');
+      }
+    });
+  }
+};
+
+/* ============================================================================
+   9) App bootstrap — timers, wiring, evaluation loop
+   ========================================================================= */
+
+/* --- Evaluate a single symbol and publish the signal --- */
+App.evaluateSymbol = function (symbolId){
+  try{
+    const c = App.candles[symbolId];
+    if (!c || !c.bars || c.bars.length < 200){
+      App.signals[symbolId] = null;
+      return null;
+    }
+
+    const sig = Strategy.evaluate(symbolId, c.bars);
+
+    // Attach live price as the entry for a fresh signal
+    if (sig){
+      const live = App.priceOf(symbolId);
+      if (U.isNum(live)){
+        const inst = App.getInstrument(symbolId);
+        const atr = sig.atr;
+        const levels = Strategy.buildLevels(sig.direction, live, atr);
+        sig.entry = levels.entry;
+        sig.sl = levels.sl;
+        sig.tp1 = levels.tp1;
+        sig.tp2 = levels.tp2;
+        sig.tp3 = levels.tp3;
+        sig.rr = levels.rr;
+      }
+    }
+
+    const prev = App.signals[symbolId];
+    App.signals[symbolId] = sig;
+
+    // Journal: flag weakening trades
+    Journal.markWeakening(symbolId, sig ? sig.score : null);
+
+    // Journal: register qualifying signals
+    if (sig && sig.score >= App.settings.minScore){
+      const added = Journal.addFromSignal(sig);
+      if (added){
+        UI.toast((sig.direction === 'BUY' ? '🟢 إشارة شراء' : '🔴 إشارة بيع') +
+                 ' — ' + symbolId + ' (نتيجة ' + sig.score + ')', 'ok');
+      }
+    }
+
+    // Alerts for NEW strong signals (debounced 10 minutes per symbol+direction)
+    if (sig && sig.score >= 70){
+      const alertKey = symbolId + ':' + sig.direction;
+      const lastAlert = App._lastSignalAlert[alertKey] || 0;
+      const isNew = !prev || prev.direction !== sig.direction || prev.score < 70;
+
+      if (isNew && (Date.now() - lastAlert > 600000)){
+        App._lastSignalAlert[alertKey] = Date.now();
+        UI.beep();
+        UI.notify('TradeRadar Pro — إشارة قوية',
+                  sig.direction + ' ' + symbolId + ' · النتيجة ' + sig.score + '/100');
+        UI.pulseCard(symbolId);
+        console.log('🟢 STRONG signal: ' + sig.direction + ' ' + symbolId + ' score=' + sig.score);
+      }
+    }
+
+    return sig;
+
+  }catch(e){
+    console.error('🔴 evaluateSymbol error for ' + symbolId + ': ' + e.message);
+    return null;
+  }
+};
+
+/* --- Evaluate all symbols --- */
+App.evaluateAll = function (){
+  for (let i = 0; i < INSTRUMENTS.length; i++){
+    App.evaluateSymbol(INSTRUMENTS[i].id);
+  }
+  UI.renderAllCards();
+  UI.renderSignalPanel();
+};
+
+/* --- Refresh candles for the active timeframe --- */
+App.refreshCandlesNow = async function (){
+  try{
+    await DataFeed.refreshCandles(App.timeframe);
+    App.evaluateAll();
+    ChartEngine.renderNative(App.activeSymbol, App.signals[App.activeSymbol]);
+    console.log('🔵 candles refreshed @ ' + App.tfMeta(App.timeframe).label);
+  }catch(e){
+    console.warn('🔴 refreshCandlesNow failed: ' + e.message);
+  }
+};
+
+/* --- Throttled re-evaluation on ticks --- */
+App._lastEval = 0;
+App._evalTimer = null;
+App.scheduleEvaluate = function (){
+  if (App._evalTimer) return;
+  App._evalTimer = setTimeout(function () {
+    App._evalTimer = null;
+    App.evaluateAll();
+  }, 2000);
+};
+
+/* --- Tick handler --- */
+App.onTick = function (symbolId, price){
+  try{
+    // 1) UI price updates
+    UI.renderCard(symbolId);
+
+    // 2) Journal status / P&L updates
+    if (U.isNum(price.mid)) Journal.onTick(symbolId, price.mid);
+
+    // 3) Native chart live candle
+    ChartEngine.updateLastCandle(symbolId);
+
+    // 4) Re-score (throttled)
+    App.scheduleEvaluate();
+
+    // 5) If the active symbol ticked, refresh the signal panel
+    if (symbolId === App.activeSymbol) UI.renderSignalPanel();
+
+  }catch(e){
+    console.warn('🔴 App.onTick error: ' + e.message);
+  }
+};
+
+/* --- Bootstrap sequence --- */
+App.boot = async function (){
+  if (App.booted) return;
+  App.booted = true;
+
+  console.log('🔵 TradeRadar Pro booting…');
+
+  // 1) Settings + journal
+  App.loadSettings();
+  Journal.load();
+  UI.renderDemoBanner();
+
+  // 2) Static UI
+  UI.init();
+  UI.renderAllCards();
+  UI.renderJournal();
+
+  // 3) Charts
+  ChartEngine.initNative();
+  ChartEngine.updateTVSymbol();
+
+  // 4) Resolve symbols (with NAS100 → US100 → NDX fallback)
+  await DataFeed.resolveSymbols();
+
+  // 5) Initial candle load for the active timeframe
+  await App.refreshCandlesNow();
+
+  // 6) Seed prices from candle closes (so the UI is never empty)
+  for (let i = 0; i < INSTRUMENTS.length; i++){
+    const inst = INSTRUMENTS[i];
+    if (App.prices[inst.id]) continue;
+    const p = App.priceOf(inst.id);
+    if (U.isNum(p)){
+      App.prices[inst.id] = { bid: p, ask: p, mid: p, prevMid: p, time: Date.now() };
+    }
+  }
+  UI.renderAllCards();
+  UI.renderSignalPanel();
+
+  // 7) Connect the live stream
+  DataFeed.init();
+  DataFeed.onTick(App.onTick);
+
+  // 8) Timers
+  //    - candles every 30s
+  setInterval(function () {
+    App.refreshCandlesNow();
+  }, 30000);
+
+  //    - REST latest-price poll every 5s (backup for the websocket)
+  setInterval(function () {
+    DataFeed.pollLatest();
+  }, 5000);
+
+  //    - first poll shortly after boot
+  setTimeout(function () { DataFeed.pollLatest(); }, 1500);
+
+  //    - render the journal every 10s to keep live P/L fresh
+  setInterval(function () {
+    if (Journal.entries.length) UI.renderJournal();
+  }, 10000);
+
+  // 9) Resume audio context on first user gesture (browser policy)
+  document.addEventListener('click', function once(){
+    try{
+      if (App._audioCtx && App._audioCtx.state === 'suspended') App._audioCtx.resume();
+    }catch(e){ /* ignore */ }
+    document.removeEventListener('click', once);
+  }, { once: true });
+
+  console.log('🟢 TradeRadar Pro ready.');
+};
+
+/* --- Kick off when the DOM is ready --- */
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', function () {
+    App.boot().catch(function (e) { console.error('🔴 boot failed:', e.message); });
+  });
+} else {
+  App.boot().catch(function (e) { console.error('🔴 boot failed:', e.message); });
+}
+
+/* --- Safety net: never let an unhandled rejection kill the dashboard --- */
+window.addEventListener('unhandledrejection', function (ev) {
+  console.warn('🔴 unhandled promise rejection:', ev.reason && ev.reason.message ? ev.reason.message : ev.reason);
+});
+window.addEventListener('error', function (ev) {
+  console.warn('🔴 runtime error:', ev.message);
+});
+
+})();
+</script>
+</body>
+</html>
