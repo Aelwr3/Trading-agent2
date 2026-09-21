@@ -1,0 +1,36 @@
+{
+  "name": "traderadar-pro-max",
+  "version": "1.0.0",
+  "description": "TradeRadar Pro MAX — 24/7 automated trading signal system with Telegram alerts (XAUUSD · NAS100 · EURUSD)",
+  "main": "bot.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node bot.js",
+    "check": "node -e \"require('./bot.js')\""
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "dotenv": "^16.4.5"
+  },
+  "keywords": [
+    "trading",
+    "signals",
+    "technical-analysis",
+    "telegram-bot",
+    "xauusd",
+    "nas100",
+    "eurusd",
+    "rsi",
+    "macd",
+    "ema",
+    "atr"
+  ],
+  "author": "TradeRadar Pro MAX",
+  "license": "MIT",
+  "private": true
+}
